@@ -57,11 +57,12 @@ int main(int argc, char *argv[]){
           printf("USER s'est déconnecté");
           break;
         case Commande.LIST:
-          printf("USER a demandé la liste des salons ouvert");
+          printf("USER a demandé la liste des salons ouverts");
           listSalon();
           break;
         case Commande.HELP:
           printf("USER a demandé de l'aide");
+          listCommandes();
           break;
         default:
           printf("Commande non reconnue");
@@ -73,15 +74,7 @@ char* listSalon(){
 
 }
 
-char* listCommande(){
-    char* ret="Commande : \n";
-    char* serveur =
-    char* nick =
-    char* join =
-    char* part =
-    char* quit =
-    char* list =
-    char* help =
-    strcat(ret,);
+char* listCommandes(){
+    char* ret="Commande : \n - /SERVER <@IP>: Demander la connexion au serveur \n - /NICK <pseudonyme>: Changer de pseudonyme \n - /JOIN <Salon>: Rejoindre un serveur \n - /PART : Quitter le salon \n - /LIST : Lister les salons ouverts \n - /HELP : Afficher la liste des commandes possibles\n";
 }
 
