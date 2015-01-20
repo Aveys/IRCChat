@@ -14,7 +14,13 @@ typedef struct Salon {
     Client * clients;
 };
 
-typedef struct Message{
-    char message[MAX_MESSAGE];
-    char salonCible[MAX_NAME];
-} Message;
+struct Message{
+    Char message[MAX_MESSAGE];
+    Char salonCible[MAX_NAME];
+};
+
+typedef enum Commande Commande;
+enum Commande
+{
+    SERVER, NICK, JOIN, PART, QUIT, LIST, HELP
+};
