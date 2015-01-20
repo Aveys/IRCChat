@@ -4,27 +4,42 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <regex.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <stdlib.h>
+#include <QTKit/QTKit.h>
 
 void clean(const char *buffer, FILE *fp);
 
 int main(int argc, char *argv[]){
-    char command[255];
-    char message[255];
-    char input[255];
+    char command[MAX_MESSAGE];
+    char message[MAX_MESSAGE];
+    char * input;
+    char * token;
+    char input2[MAX_MESSAGE];
 
     puts("## Bienvenue ##");
-    puts("## Entrez une commande (/HELP pour recevoir de l'aide)");
 
-    fgets(input, sizeof(input), stdin);
-    clean(input, stdin);
+    for (;;) {
+        puts("## Entrez une commande (/HELP pour recevoir de l'aide)");
 
-    sscanf(input, "/%s %s", command, message);
+        fgets(input2, sizeof(input2), stdin);
+        clean(input2, stdin);
 
-    printf("%s %s", command, message);
+        input = strdup(input2);
+
+        if (input[0] == '/') {
+            input++;
+        }
+
+        token = strtok(input, " ");
+    }
 }
 
+/**
+ * Supprime le \n du buffer et de stdin
+ */
 void clean(const char *buffer, FILE *fp) {
     char *p = strchr(buffer,'\n');
     if (p != NULL)

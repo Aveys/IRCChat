@@ -9,7 +9,7 @@ typedef struct Client {
     struct sockaddr_in socket_addr;
 } Client;
 
-typedef struct Salon{
+typedef struct Salon {
     char name[MAX_NAME];
     Client * clients;
 };
