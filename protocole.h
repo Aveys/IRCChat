@@ -14,5 +14,5 @@ struct Salon{
 
 struct Message{
     Char message[MAX_MESSAGE];
-    CHAR salonCible[MAX_NAME];
+    Char salonCible[MAX_NAME];
 };
