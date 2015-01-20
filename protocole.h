@@ -5,10 +5,17 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+<<<<<<< HEAD
 typedef struct Client {
     char pseudo[MAX_NAME];
     struct sockaddr_in socket_addr;
 } Client;
+=======
+struct Salon{
+    Char name[MAX_NAME];
+    Client * clients;
+};
+>>>>>>> d021c13641e77ab2c3f2032b24f65efcd116852b
 
 typedef struct Salon {
     char nom[MAX_NAME];
