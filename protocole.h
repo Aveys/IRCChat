@@ -2,17 +2,27 @@
 #define MAX_CLIENT 50
 #define MAX_MESSAGE 250
 
-struct Client{
-    Char nickname[MAX_NAME];
-    Sockaddr_in socket_addr;
-};
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
+<<<<<<< HEAD
+typedef struct Client {
+    char pseudo[MAX_NAME];
+    struct sockaddr_in socket_addr;
+} Client;
+=======
 struct Salon{
     Char name[MAX_NAME];
     Client * clients;
 };
+>>>>>>> d021c13641e77ab2c3f2032b24f65efcd116852b
 
-struct Message{
-    Char message[MAX_MESSAGE];
-    Char salonCible[MAX_NAME];
-};
+typedef struct Salon {
+    char nom[MAX_NAME];
+    Client clients[MAX_CLIENT];
+} Salon;
+
+typedef struct Message{
+    char message[MAX_MESSAGE];
+    char salonCible[MAX_NAME];
+} Message;
