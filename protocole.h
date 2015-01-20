@@ -9,7 +9,7 @@ struct Client{
 
 struct Salon{
     Char name[MAX_NAME];
-    Client listeClients[MAX_CLIENT];
+    Client * clients;
 };
 
 struct Message{

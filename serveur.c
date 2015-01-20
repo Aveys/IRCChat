@@ -7,7 +7,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#
+#define SERVER_PORT 1500
 
 int main(int argc, char *argv[]){
     int sd, n;
@@ -30,6 +30,7 @@ int main(int argc, char *argv[]){
         perror("bind");
         return 1;
     }
+
     for (;;)
     {
         addr_len = sizeof(client_addr);
