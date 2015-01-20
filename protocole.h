@@ -12,12 +12,12 @@ typedef struct Client {
 typedef struct Salon {
     char name[MAX_NAME];
     Client * clients;
-};
+} Salon;
 
 struct Message{
-    Char message[MAX_MESSAGE];
-    Char salonCible[MAX_NAME];
-};
+    char message[MAX_MESSAGE];
+    char salonCible[MAX_NAME];
+} Message;
 
 typedef enum Commande Commande;
 enum Commande

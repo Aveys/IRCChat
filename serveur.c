@@ -2,6 +2,7 @@
 #include "serveur.h"
 
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -11,12 +12,13 @@
 #define PORT_SERVEUR 1500
 
 
-struct Client clients[];
+struct Client clients[10];
 int nbClients=0;
+int sd;
 
 int main(int argc, char *argv[]) {
     pthread_t thread;
-    int sd, n;
+    int n;
     socklen_t addr_len;
     struct sockaddr_in client_addr, server_addr;
     struct Message msg;
@@ -39,10 +41,12 @@ int main(int argc, char *argv[]) {
 
     for (; ;) {
         addr_len = sizeof(client_addr);
-        n = recvfrom(sd, msg, sizeof(msg), 0, (struct sockaddr *) &client_addr, &addr_len);
-        if (startsWith("CONNECT",msg.message )) {
-            print("Connection d'un nouveau client : %s", inet_ntoa(client_addr.sin_addr));
-            if(pthread_create(&thread, NULL, thread_client, sd)){
+        n = recvfrom(sd,&msg, sizeof(msg), 0, (struct sockaddr *) &client_addr, &addr_len);
+        if (strcmp(msg.message,"CONNECT")) {
+            printf("Connection d'un nouveau client : %s", inet_ntoa(client_addr.sin_addr));
+            struct Args_Thread args;
+            args.addr=client_addr;
+            if(pthread_create(&thread, NULL, thread_client, (void *)&args) != 0){
                 perror("Impossible de creer le thread");
             }
         }
@@ -80,10 +84,19 @@ int main(int argc, char *argv[]) {
     }
 }
 
-void * thread_client(int socket){
+void *thread_client(void *arguments){
+    struct Args_Thread *args = arguments;
+
     struct Client moi;
-    moi.
-    clients[nbClients] =
+    strcpy(moi.pseudo,"Anon");
+    moi.socket_addr=args->addr;
+    clients[nbClients]=moi;
+    nbClients++;
+
+    struct Message msg;
+    strcpy(msg.message,"ACK_CONNECTED");
+    strcpy(msg.salonCible,"NULL");
+    sendto(sd,&msg,sizeof(msg),0, (struct sockaddr *)&moi.socket_addr, sizeof(moi.socket_addr));
 
 }
 char* listSalon(){
@@ -93,9 +106,10 @@ char* listCommandes(){
     char* ret="Commande : \n - /SERVER <@IP>: Demander la connexion au serveur \n - /NICK <pseudonyme>: Changer de pseudonyme \n - /JOIN <Salon>: Rejoindre un serveur \n - /PART : Quitter le salon \n - /LIST : Lister les salons ouverts \n - /HELP : Afficher la liste des commandes possibles\n";
 }
 
+/*
 int startsWith(const char *pre, const char *str)
 {
     size_t lenpre = strlen(pre),
             lenstr = strlen(str);
     return lenstr < lenpre ? 0 : strncmp(pre, str, lenpre) == 0;
-}
+}*/
