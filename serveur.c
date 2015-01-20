@@ -9,7 +9,10 @@
 #include <pthread.h>
 
 #define PORT_SERVEUR 1500
-#define NB
+
+
+struct Client clients[];
+int nbClients=0;
 
 int main(int argc, char *argv[]) {
     pthread_t thread;
@@ -18,7 +21,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in client_addr, server_addr;
     struct Message msg;
 
-    struct Client
+
 
     // Create socket
     if ((sd = socket(PF_INET, SOCK_DGRAM, 0)) == -1) {
@@ -37,13 +40,13 @@ int main(int argc, char *argv[]) {
     for (; ;) {
         addr_len = sizeof(client_addr);
         n = recvfrom(sd, msg, sizeof(msg), 0, (struct sockaddr *) &client_addr, &addr_len);
-        if (str.cmp(msg.message, "CONNECT")) {
+        if (startsWith("CONNECT",msg.message )) {
             print("Connection d'un nouveau client : %s", inet_ntoa(client_addr.sin_addr));
             if(pthread_create(&thread, NULL, thread_client, sd)){
-
+                perror("Impossible de creer le thread");
             }
         }
-        Message msg;
+        /*Message msg;
         msg.message = "VIDE";
         msg.salonCible = "Accueil";
 
@@ -73,12 +76,14 @@ int main(int argc, char *argv[]) {
             default:
                 printf("Commande non reconnue");
                 break;
-        }
+        }*/
     }
 }
 
 void * thread_client(int socket){
-
+    struct Client moi;
+    moi.
+    clients[nbClients] =
 
 }
 char* listSalon(){
@@ -86,4 +91,11 @@ char* listSalon(){
 
 char* listCommandes(){
     char* ret="Commande : \n - /SERVER <@IP>: Demander la connexion au serveur \n - /NICK <pseudonyme>: Changer de pseudonyme \n - /JOIN <Salon>: Rejoindre un serveur \n - /PART : Quitter le salon \n - /LIST : Lister les salons ouverts \n - /HELP : Afficher la liste des commandes possibles\n";
+}
+
+int startsWith(const char *pre, const char *str)
+{
+    size_t lenpre = strlen(pre),
+            lenstr = strlen(str);
+    return lenstr < lenpre ? 0 : strncmp(pre, str, lenpre) == 0;
 }
