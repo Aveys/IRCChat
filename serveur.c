@@ -8,13 +8,17 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 
-#define SERVER_PORT 1500
+#define PORT_SERVEUR 1500
+#define NB
 
 int main(int argc, char *argv[]) {
+    pthread_t thread;
     int sd, n;
     socklen_t addr_len;
     struct sockaddr_in client_addr, server_addr;
     struct Message msg;
+
+    struct Client
 
     // Create socket
     if ((sd = socket(PF_INET, SOCK_DGRAM, 0)) == -1) {
@@ -24,7 +28,7 @@ int main(int argc, char *argv[]) {
     // Bind it
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    server_addr.sin_port = htons(SERVER_PORT);
+    server_addr.sin_port = htons(PORT_SERVEUR);
     if (bind(sd, (struct sockaddr *) &server_addr, sizeof server_addr) == -1) {
         perror("bind");
         return 1;
@@ -35,45 +39,48 @@ int main(int argc, char *argv[]) {
         n = recvfrom(sd, msg, sizeof(msg), 0, (struct sockaddr *) &client_addr, &addr_len);
         if (str.cmp(msg.message, "CONNECT")) {
             print("Connection d'un nouveau client : %s", inet_ntoa(client_addr.sin_addr));
+            if(pthread_create(&thread, NULL, thread_client, sd)){
+
+            }
         }
         Message msg;
         msg.message = "VIDE";
         msg.salonCible = "Accueil";
 
-
-    switch (msg.message)
-    {
-        case Commande.SERVER:
-          printf("USER demande la connexion au serveur");
-          break;
-        case Commande.NICK:
-          printf("USER a changé de pseudonyme");
-          break;
-        case Commande.JOIN:
-          printf("USER a demande à rejoindre SALON");
-          break;
-        case Commande.PART:
-          printf("USER a quitté le SALON");
-          break;
-        case Commande.QUIT:
-          printf("USER s'est déconnecté");
-          break;
-        case Commande.LIST:
-          printf("USER a demandé la liste des salons ouverts");
-          listSalon();
-          break;
-        case Commande.HELP:
-          printf("USER a demandé de l'aide");
-          listCommandes();
-          break;
-        default:
-          printf("Commande non reconnue");
-          break;
-
+        switch (msg.message) {
+            case Commande.SERVER:
+                printf("USER demande la connexion au serveur");
+                break;
+            case Commande.NICK:
+                printf("USER a changÃ© de pseudonyme");
+                break;
+            case Commande.JOIN:
+                printf("USER a demande Ã  rejoindre SALON");
+                break;
+            case Commande.PART:
+                printf("USER a quittÃ© le SALON");
+                break;
+            case Commande.QUIT:
+                printf("USER s'est dÃ©connectÃ©");
+                break;
+            case Commande.LIST:
+                printf("USER a demandÃ© la liste des salons ouvert");
+                listSalon();
+                break;
+            case Commande.HELP:
+                printf("USER a demandÃ© de l'aide");
+                break;
+            default:
+                printf("Commande non reconnue");
+                break;
         }
     }
 }
 
+void * thread_client(int socket){
+
+
+}
 char* listSalon(){
 }
 
