@@ -1,0 +1,8 @@
+CFLAGS= -Wall -Wextra -O2 -g -lpthread
+all: client server
+server: server.o
+	gcc $^ -o $@
+client: client.o
+	gcc $^ -o $@
+clean:
+	@rm *.o client server
