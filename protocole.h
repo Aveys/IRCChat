@@ -16,3 +16,9 @@ struct Message{
     Char message[MAX_MESSAGE];
     Char salonCible[MAX_NAME];
 };
+
+typedef enum Commande Commande;
+enum Commande
+{
+    SERVER, NICK, JOIN, PART, QUIT, LIST, HELP
+};
