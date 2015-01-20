@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 
 #define SERVER_PORT 1500
 
@@ -13,8 +14,8 @@ int main(int argc, char *argv[]){
     int sd, n;
     socklen_t addr_len;
     struct sockaddr_in client_addr, server_addr;
-    char msgbuf[MAX_MSG];
-    char reponse[] = "ACK";
+    struct Message msg;
+
     // Create socket
     if ((sd = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
     {
@@ -33,20 +34,11 @@ int main(int argc, char *argv[]){
 
     for (;;)
     {
-        addr_len = sizeof(client_addr);
-        n = recvfrom(sd, msgbuf, MAX_MSG, 0,
-                (struct sockaddr *)&client_addr, &addr_len);
-        if (n == -1)
-            perror("recvfrom");
-        else {
-            printf("received from %s: %s\n",
-                    inet_ntoa(client_addr.sin_addr), msgbuf);
 
-            if(sendto(sd, reponse, sizeof(reponse), 0, (struct sockaddr *)&client_addr, addr_len)== -1)
-            {
-                perror("sendto");
-                return 1;
-            }
+        addr_len = sizeof(client_addr);
+        n = recvfrom(sd, msg, sizeof(msg), 0, (struct sockaddr *)&client_addr, &addr_len);
+        if {
+            printf("Connection d'un nouveau client");
         }
     }
     return 0;
