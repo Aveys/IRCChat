@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 void clean(const char *buffer, FILE *fp);
 
@@ -20,6 +21,28 @@ int sckt = -1;
 * Structure de gestion d'adresses cliente et serveur
 */
 struct sockaddr_in client_addr, serv_addr;
+
+/**
+* Thread d'écoute serveur
+*/
+pthread_t ecoute;
+
+/**
+* Communications
+*/
+Communication * communications;
+
+/**
+* Thread d'écoute serveur
+*/
+void * thread_process(void) {
+    char * buffer;
+    int n;
+
+    if ((n = read(sckt, buffer, MAX_MESSAGE)) > 0) {
+        printf("Server: %s\n", buffer);
+    }
+}
 
 /**
 * Gère la connexion à un serveur de communication
@@ -50,6 +73,8 @@ int server(char * address, char * port) {
         perror("connect");
         return 1;
     }
+
+    pthread_create(&ecoute, NULL, thread_process, NULL);
 }
 
 /**
