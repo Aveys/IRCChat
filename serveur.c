@@ -105,7 +105,6 @@ void *thread_client(void *arguments){
             fputs("Commande non reconnue",stdout);
         }
     }
-    }
 }
 
 char* listeSalon(){
@@ -125,7 +124,9 @@ char* listeCommandes(){
 void envoyerMessageClient(struct Clients client,struct Message msg){
     sendto(sd,&msg,sizeof(Message),0, (struct sockaddr *)&client.socket_addr, sizeof(client.socket_addr));
 }
+void envoyerMessageSalon(struct Salon salon, struct Message msg){
 
+}
 /*
 int startsWith(const char *pre, const char *str)
 {

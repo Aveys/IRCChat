@@ -12,6 +12,7 @@ typedef struct Client {
 typedef struct Salon {
     char name[MAX_NAME];
     Client * clients;
+    int nbClient
 } Salon;
 
 struct Message {
@@ -25,8 +26,3 @@ typedef struct Communication {
     struct Communication * next;
 } Communication;
 
-typedef enum Commande Commande;
-enum Commande
-{
-    SERVER, NICK, JOIN, PART, QUIT, LIST, HELP
-};

@@ -1,8 +1,9 @@
-#include "protocole.h"
-
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/wait.h>
 #include <netinet/in.h>
 #include <regex.h>
 #include <arpa/inet.h>
@@ -10,12 +11,19 @@
 #include <stdlib.h>
 #include <pthread.h>
 
+#include "protocole.h"
+
 void clean(const char *buffer, FILE *fp);
 
 /**
-* @var socket client
+* Socket client
 */
 int sckt = -1;
+
+/**
+* Mutex pour accès aux communications
+*/
+int communications_mutex;
 
 /**
 * Structure de gestion d'adresses cliente et serveur
@@ -28,8 +36,14 @@ struct sockaddr_in client_addr, serv_addr;
 pthread_t ecoute;
 
 /**
+* Mutex d'accès aux ressources
+*/
+pthread_mutex_t * communication_mutex;
+
+/**
 * Communications
 */
+int shmid;
 Communication * communications;
 
 void _log(char * message) {
@@ -39,7 +53,7 @@ void _log(char * message) {
 /**
 * Thread d'écoute serveur
 */
-void * thread_process(void) {
+void * thread_process(void * var) {
     char * buffer;
     char target[3];
     int n;
@@ -49,13 +63,19 @@ void * thread_process(void) {
 
         strncpy(target, buffer, 3);
 
+        pthread_mutex_lock(communication_mutex);
+
         // Si c'est un message d'acquittement
         if (strcmp(target, "ACK")) {
 
         } else {
-
+            return buffer;
         }
+
+        pthread_mutex_unlock(communication_mutex);
     }
+
+    return NULL;
 }
 
 /**
@@ -65,16 +85,11 @@ void * thread_process(void) {
 * @var port     Port du serveur
 */
 int server(char * address, char * port) {
+    quit();
+
     if ((sckt = socket(PF_INET, SOCK_DGRAM, 0)) == -1) {
         return 1;
     }
-
-    client_addr.sin_family = AF_INET;
-    client_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    client_addr.sin_port        = htons(0);
-
-    // Fill server address structure
-    serv_addr.sin_family = AF_INET;
 
     if (inet_aton(address, &(serv_addr.sin_addr)) == 0) {
         printf("Invalid IP address format <%s>\n", address);
@@ -88,6 +103,7 @@ int server(char * address, char * port) {
         return 1;
     }
 
+    pthread_mutex_init(communication_mutex, NULL);
     pthread_create(&ecoute, NULL, thread_process, NULL);
 }
 
@@ -103,16 +119,31 @@ int communicate(char * data) {
     return 0;
 }
 
+/**
+* Fonction pour quitter le serveur
+*/
+void quit(void) {
+    if (sckt == -1) {
+        pthread_join(ecoute, NULL);
+        close(sckt);
+    }
+}
+
 int main(int argc, char *argv[]) {
     char * input;
-    char * token;
+    char * token = "NOQUIT";
     char * address;
     char * port;
     char input2[MAX_MESSAGE];
 
+    client_addr.sin_family = AF_INET;
+    client_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    client_addr.sin_port        = htons(0);
+    serv_addr.sin_family = AF_INET;
+
     puts("## Bienvenue ##");
 
-    for (;;) {
+    while (strcmp(token, "QUIT") != 0) {
         puts("## Entrez une commande (/HELP pour recevoir de l'aide)");
 
         fgets(input2, sizeof(input2), stdin);
@@ -138,6 +169,8 @@ int main(int argc, char *argv[]) {
             }
         }
     }
+
+    quit();
 
     return 0;
 }
