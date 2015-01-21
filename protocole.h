@@ -12,6 +12,7 @@ typedef struct Client {
 typedef struct Salon {
     char name[MAX_NAME];
     Client * clients;
+    int nbClient
 } Salon;
 
 struct Message {
