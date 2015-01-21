@@ -11,15 +11,14 @@
 
 #define PORT_SERVEUR 1500
 
-
-struct Client clients[10];
-struct Salon salons[10];
+struct Client *clients=NULL;//tableau des clients connecté
 int nbClients=0;
+struct Salon *salons=NULL;//tableau des salons crées
 int nbSalons=0;
 int sd;
 
 int main(int argc, char *argv[]) {
-
+    clients = malloc(sizeof(Client));
     pthread_t thread;
     int n;
     socklen_t addr_len;
@@ -69,8 +68,9 @@ void *thread_client(void *arguments){
     struct Client moi;
     strcpy(moi.pseudo,"Anon");
     moi.socket_addr=args->addr;
-    clients[nbClients]=moi;
     nbClients++;
+    clients = malloc(nbClients* sizeof(Client));
+    clients[nbClients]=moi;
 
     struct Message msg;
     strcpy(msg.message,"ACK_CONNECTED");
@@ -125,7 +125,11 @@ void envoyerMessageClient(struct Clients client,struct Message msg){
     sendto(sd,&msg,sizeof(Message),0, (struct sockaddr *)&client.socket_addr, sizeof(client.socket_addr));
 }
 void envoyerMessageSalon(struct Salon salon, struct Message msg){
-
+    struct Client c;
+    for (int i = 0; i < salon.nbClient; i++) {
+        c=salon.clients[i];
+        envoyerMessageClient(c,msg);
+    }
 }
 /*
 int startsWith(const char *pre, const char *str)
