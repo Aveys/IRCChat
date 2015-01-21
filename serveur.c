@@ -29,7 +29,6 @@ int main(int argc, char *argv[]) {
     socklen_t addr_len;
     struct sockaddr_in client_addr, server_addr;
     struct Message msg;
-    struct Args_Thread args;
 
 
 
@@ -48,9 +47,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    struct Client tmp;
+
     for (; ;) {
         // bloc de réception des clients
-        printf("En attente d'une connection\n");
+        printf("En attente d'une trame\n");
         addr_len = sizeof(client_addr);
         n = recvfrom(sd,&msg, sizeof(Message), 0, (struct sockaddr *) &client_addr, &addr_len);
         if (n == -1)
@@ -59,81 +60,72 @@ int main(int argc, char *argv[]) {
         printf("Structure reçu : %s, %s\n",msg.message,msg.salonCible); //DEBUG
 
         if (strcmp(msg.message,"CONNECT")==0){// Vérification que le message commence par CONNECT
-            printf("Connection d'un nouveau client : %s\n", inet_ntoa(client_addr.sin_addr)); //DEBUG
-            args.addr=client_addr; //ajout du nouveau client à un structure argument pour la creation du thread)
 
-            if(pthread_create(&thread, NULL, thread_client, (void *)&args) != 0){//démarrage d'un thread pour ce client
-                perror("Impossible de creer le thread");
+            printf("Demande de connection d'un nouveau client : %s\n", inet_ntoa(client_addr.sin_addr)); //DEBUG
+            Client recherche = findClient(client_addr);
+            if(strcmp(recherche.pseudo,"introuvable")==0){
+                printf("Ajout du client\n");
+                strcpy(tmp.pseudo,"ANONYME");
+                tmp.socket_addr=client_addr;
+                clients[nbClients]=tmp;
+                nbClients++;
+                // creation de la structure de réponse à la connection
+                strcpy(msg.message,"ACK_CONNECTED");
+                strcpy(msg.salonCible,"");
+                sendto(sd,&msg, sizeof(Message),0,(struct sockaddr *) &client_addr,addr_len);
+            }
+            else{
+                strcpy(msg.message,"ERR_IPALREADYUSED");
+                strcpy(msg.salonCible,"");
+                sendto(sd,&msg, sizeof(Message),0,(struct sockaddr *) &client_addr,addr_len);
             }
         }
-    }
-}
+        else if (strcmp(msg.message, "NICK") == 0) {
 
-void *thread_client(void *arguments){
+        }
+        else if (strcmp(msg.message, "JOIN") == 0) {
+            fputs("USER a demande à rejoindre SALON", stdout);
+        }
+        else if (strcmp(msg.message, "PART") == 0) {
+            fputs("USER a quitté le SALON", stdout);
+        }
+        else if (strcmp(msg.message, "QUIT") == 0) {
+            //VERIFIER PRESENCE DANS SALON -> SUPPRIMER DES SALONS
 
-    int estVivant = 1;
-    int n;
-
-    fputs("Dans le thread\n",stdout); //DEBUG
-    struct Args_Thread *args = arguments;// Récupération des arguments
-
-    struct Client moi; //création de la structure client
-
-    strcpy(moi.pseudo,"Anon");// Nickname temporaire
-    moi.socket_addr=args->addr;
-    nbClients++;
-    clients = malloc(nbClients* sizeof(Client));
-    clients[nbClients]=moi;
-
-
-    struct Message msg;// creation de la structure de réponse à la connection
-    strcpy(msg.message,"ACK_CONNECTED");
-    strcpy(msg.salonCible,"");
-
-    socklen_t addr_len;
-    struct sockaddr_in client_addr;
-
-    sendto(sd,&msg,sizeof(Message),0, (struct sockaddr *) &moi.socket_addr, sizeof(moi.socket_addr));
-
-    while(estVivant == 1){
-
-        n = recvfrom(sd,&msg, sizeof(Message), 0, (struct sockaddr *)&client_addr, addr_len);// reception des trames du client
-
-        if (n == -1){
-            perror("recvfrom");
+            //supprimerClient(); SUPPRIMER DU SERVEUR
+        }
+        else if (strcmp(msg.message, "LIST") == 0) {
+            fputs("USER a demandé la liste des salons ouvert", stdout);
+            msg = listeSalon();
+            //envoyerMessageClient(moi, msg);
+        }
+        else if (strcmp(msg.message, "HELP") == 0) {
+            fputs("USER a demandé de l'aide", stdout);
+            msg = listeSalon();
+            //envoyerMessageClient(moi, msg);
         }
         else {
-            if (strcmp(msg.message, "NICK") == 0) {
-
-            }
-            else if (strcmp(msg.message, "JOIN") == 0) {
-                fputs("USER a demande à rejoindre SALON", stdout);
-            }
-            else if (strcmp(msg.message, "PART") == 0) {
-                fputs("USER a quitté le SALON", stdout);
-            }
-            else if (strcmp(msg.message, "QUIT") == 0) {
-                fputs("USER s'est déconnecté", stdout);
-            }
-            else if (strcmp(msg.message, "LIST") == 0) {
-                fputs("USER a demandé la liste des salons ouvert", stdout);
-                msg = listeSalon();
-                envoyerMessageClient(moi, msg);
-            }
-            else if (strcmp(msg.message, "HELP") == 0) {
-                fputs("USER a demandé de l'aide", stdout);
-                msg = listeSalon();
-                envoyerMessageClient(moi, msg);
-            }
-            else {
-                fputs("Commande non reconnue", stdout);
-                msg = erreurCommande();
-                envoyerMessageClient(moi, msg);
-            }
+            fputs("Commande non reconnue", stdout);
+            msg = erreurCommande();
+            //envoyerMessageClient(moi, msg);
         }
     }
 }
 
+struct Client findClient(struct sockaddr_in adresse){
+    struct sockaddr_in c;
+    for (int i = 0; i < nbClients; i++) {
+        c=clients[nbClients].socket_addr;
+        if(strcmp(inet_ntoa(adresse.sin_addr),inet_ntoa(c.sin_addr))==0){
+            printf("Client trouvé\n");
+            return clients[nbClients];
+        }
+    }
+    printf("Utilisateur %s introuvable\n",inet_ntoa(adresse.sin_addr));
+    struct Client tmp;
+    strcpy(tmp.pseudo,"introuvable");
+    return tmp;
+}
 struct Message listeSalon(){
     struct Message ret;
     strcpy(ret.salonCible,"NULL");
