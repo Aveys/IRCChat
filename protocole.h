@@ -3,10 +3,12 @@
 
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <time.h>
 
 typedef struct Client {
     char pseudo[MAX_NAME];
     struct sockaddr_in socket_addr;
+    int estVivant;
 } Client;
 
 typedef struct Salon {
@@ -18,6 +20,7 @@ typedef struct Salon {
 struct Message {
     char message[MAX_MESSAGE];
     char salonCible[MAX_NAME];
+    time_t t;
 } Message;
 
 typedef struct Communication {
