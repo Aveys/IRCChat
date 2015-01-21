@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/wait.h>
 #include <netinet/in.h>
 #include <regex.h>
 #include <arpa/inet.h>
@@ -18,14 +21,10 @@ void clean(const char *buffer, FILE *fp);
 int sckt = -1;
 
 /**
-* Mutex pour accès aux communications
-*/
-int communications_mutex;
-
-/**
-* Structure de gestion d'adresses cliente et serveur
+* Structures de gestion d'adresses cliente et serveur
 */
 struct sockaddr_in client_addr, serv_addr;
+socklen_t addr_len;
 
 /**
 * Thread d'écoute serveur
@@ -35,7 +34,7 @@ pthread_t ecoute;
 /**
 * Mutex d'accès aux ressources
 */
-pthread_mutex_t * communication_mutex;
+pthread_mutex_t communication_mutex;
 
 /**
 * Communications
@@ -43,59 +42,81 @@ pthread_mutex_t * communication_mutex;
 Communication * communications;
 
 void _log(char * message) {
-    printf("%s\n", message);
+    puts(message);
 }
 
 /**
-* Thread d'écoute serveur
+* Envoie une communication avec le serveur avec un thread non bloquant
 */
-void * thread_process(void * var) {
-    char * buffer;
+void * thread_communicate(void * var) {
+    fd_set rfds;
+    struct timeval tv;
+    int retval;
+
+    char * data = (char *) var;
+    char buffer[255];
     char target[3];
-    int n;
 
-    if ((n = read(sckt, buffer, MAX_MESSAGE)) > 0) {
-        printf("Server: %s\n", buffer);
+    FD_ZERO(&rfds);
+    FD_SET(sckt, &rfds);
 
-        strncpy(target, buffer, 3);
+    tv.tv_sec = 5;
+    tv.tv_usec = 0;
 
-        pthread_mutex_lock(communication_mutex);
+    if (sendto(sckt, data, strlen(data) + 1, 0, (struct sockaddr *)&serv_addr, addr_len)) {
+        perror("sendto");
+        return NULL;
+    }
 
-        // Si c'est un message d'acquittement
-        if (strcmp(target, "ACK")) {
+    retval = select(sckt + 1, &rfds, NULL, NULL, &tv);
 
-        } else {
-            return buffer;
+    if (retval == -1) {
+        perror("select()");
+    } else if (retval) {
+        if (FD_ISSET(sckt + 1, &rfds)) {
+            if (recvfrom(sckt, buffer, MAX_MESSAGE, 0, (struct sockaddr *) &serv_addr, &addr_len) > 0) {
+                strncpy(target, buffer, 3);
+
+                if (strcmp("ACK", buffer) == 0) {
+                    return NULL;
+                }
+            }
         }
-
-        pthread_mutex_unlock(communication_mutex);
+    } else {
+        _log("# Message non reçu par le serveur... Le renvoyer ? (Y/n)");
     }
 
     return NULL;
 }
 
 /**
-* Gère la connexion à un serveur de communication
-*
-* @var address  Adresse IP du serveur
-* @var port     Port du serveur
-*/
+ * Engage une communication
+ */
+void communicate(char * message) {
+    pthread_mutex_lock(&communication_mutex);
+
+    pthread_create(&ecoute, NULL, thread_communicate, message);
+
+    pthread_mutex_unlock(&communication_mutex);
+}
+
+/**
+ * Gère la connexion à un serveur de communication
+ *
+ * @var address  Adresse IP du serveur
+ * @var port     Port du serveur
+ */
 int server(char * address, char * port) {
-    if (sckt == -1) {
-        pthread_exit(ecoute);
-        close(sckt);
-    }
+    char * message = "CONNECT";
 
     if ((sckt = socket(PF_INET, SOCK_DGRAM, 0)) == -1) {
         return 1;
     }
 
-    client_addr.sin_family = AF_INET;
-    client_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    client_addr.sin_port        = htons(0);
-
-    // Fill server address structure
-    serv_addr.sin_family = AF_INET;
+    if (bind(sckt,(struct sockaddr *) &client_addr, sizeof client_addr) == -1) {
+        perror("bind");
+        return 1;
+    }
 
     if (inet_aton(address, &(serv_addr.sin_addr)) == 0) {
         printf("Invalid IP address format <%s>\n", address);
@@ -104,66 +125,44 @@ int server(char * address, char * port) {
 
     serv_addr.sin_port = htons(atoi(port));
 
-    if (connect(sckt, (struct sockaddr *) &serv_addr, sizeof serv_addr) == 1) {
-        perror("connect");
-        return 1;
-    }
+    addr_len = sizeof(serv_addr);
 
-    pthread_mutex_init(communication_mutex, NULL);
-    pthread_create(&ecoute, NULL, thread_process, NULL);
+    communicate(message);
+
+    free(message);
 }
 
 /**
- * Envoie une communication avec le serveur
+ * Fonction pour quitter le serveur
  */
+void quit(void) {
+    if (sckt == -1) {
+        pthread_join(ecoute, NULL);
 
-void enqueue(Communication **p_queue, char * data) {
-    Communication *p_nouveau = malloc(sizeof *p_nouveau);
-    if (p_nouveau != NULL) {
-        p_nouveau->suivant = NULL;
-        p_nouveau->message = data;
-        p_nouveau->acquitted = 0;
-        if (*p_queue == NULL) {
-            *p_queue = p_nouveau;
-        } else {
-            Communication *p_tmp = *p_queue;
-            while (p_tmp->suivant != NULL) {
-                p_tmp = p_tmp->suivant;
-            }
-            p_tmp->suivant = p_nouveau;
-        }
+
+        close(sckt);
+        sckt = -1;
     }
-}
-
-int communicate(char * data) {
-    if (sendto(sckt, data, strlen(data) + 1, 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
-        perror("sendto");
-        return 1;
-    }
-
-    communications = enqueue(communications, data);
-
-
-    return 0;
 }
 
 int main(int argc, char *argv[]) {
     char * input;
-    char * token;
+    char * token = "NOQUIT";
     char * address;
     char * port;
     char input2[MAX_MESSAGE];
 
+    client_addr.sin_family = AF_INET;
+    client_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    client_addr.sin_port        = htons(0);
+    serv_addr.sin_family = AF_INET;
 
-    // INIT QUEUE
+    _log("## Bienvenue ##");
 
-    queue = malloc(sizeof (Communication));
-    queue->suivant = NULL;
+    pthread_mutex_init(&communication_mutex, NULL);
 
-    puts("## Bienvenue ##");
-
-    for (;;) {
-        puts("## Entrez une commande (/HELP pour recevoir de l'aide)");
+    while (strcmp(token, "QUIT") != 0) {
+        _log("## Entrez une commande (/HELP pour recevoir de l'aide)");
 
         fgets(input2, sizeof(input2), stdin);
         clean(input2, stdin);
@@ -183,11 +182,16 @@ int main(int argc, char *argv[]) {
 
             }
         } else {
-            if (sckt != -1 && communicate(input)) {
-
+            if (sckt != -1) {
+                communicate(input);
             }
         }
+
+        free(input);
     }
+
+    _log("Exiting the application...");
+    pthread_join(ecoute, NULL);
 
     return 0;
 }
