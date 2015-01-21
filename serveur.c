@@ -76,9 +76,9 @@ void *thread_client(void *arguments){
 
 
     struct Message msg;
-    msg.message=strdup("ACK_CONNECTED");
-    msg.salonCible=strdup("");
-
+    strcpy(msg.message,"ACK_CONNECTED");
+    strcpy(msg.salonCible,"NULL");
+    
     socklen_t addr_len;
     struct sockaddr_in client_addr;
 
@@ -143,6 +143,29 @@ struct Message erreurCommande(){
     strcpy(ret.salonCible,"NULL");
     strcpy(ret.message,"ERR_CMDUNKNOWN");
     return ret;
+}
+
+Struct Message joinSrv(char* nomSalon){
+    //Vérifier si le salon existe
+    int existe=0;
+    for(i=0;i<nbSalons;i++){
+        if(nomSalon=salons->name){
+            existe=1;
+            break;
+        }
+     }
+    //SI n'existe pas ALORS création du salon
+    if(!existe){
+        Salon s;
+        s.name=nomSalon;
+        s.clients="NOM CLIENT";
+        
+    }
+    strcat(ret.message," ");
+    strcat(ret.message,salons.name);
+
+    //Ajout du client au salon
+    //Informer autres clients
 }
 
 void envoyerMessageClient(struct Client client,struct Message msg){
