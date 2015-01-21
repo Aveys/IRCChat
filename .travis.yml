@@ -3,3 +3,5 @@ compiler:
   - clang
   - gcc
 script: make serveur & make client
+notifications:
+  email: false
