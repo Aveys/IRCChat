@@ -95,31 +95,46 @@ void *thread_client(void *arguments){
         }
         else if(strcmp(msg.message,"LIST")==0){
             fputs("USER a demandé la liste des salons ouvert",stdout);
-            //listeSalon();
+            msg = listeSalon();
+            envoyerMessageClient(moi, msg);
         }
         else if(strcmp(msg.message,"HELP")==0){
             fputs("USER a demandé de l'aide",stdout);
-            listeCommandes();
+            msg = listeSalon();
+            envoyerMessageClient(moi, msg);
         }
         else{
             fputs("Commande non reconnue",stdout);
+            msg = erreurCommande();
+            envoyerMessageClient(moi, msg);
         }
     }
 }
 
-char* listeSalon(){
-    char* ret ="ACK_LIST";
+Message listeSalon(){
+    Message ret;
+    strcpy(ret.salonCible,"NULL");
+    strcpy(ret.message,"ACK_LIST");
     for(i=0;i<nbSalons;i++){
-        strcat(ret," ");
-        strcat(ret,salons.name);
+        strcat(ret.message," ");
+        strcat(ret.message,salons.name);
     }
     return ret;
 }
 
-char* listeCommandes(){
-    char* ret="ACK_HELP /SERVER <@IP>: Demander la connexion au serveur \n - /NICK <pseudonyme>: Changer de pseudonyme \n - /JOIN <Salon>: Rejoindre un serveur \n - /PART : Quitter le salon \n - /LIST : Lister les salons ouverts \n - /HELP : Afficher la liste des commandes possibles\n";
+Message listeCommandes(){
+    Message ret;
+    strcpy(ret.message,"ACK_HELP /SERVER <@IP>: Demander la connexion au serveur \n - /NICK <pseudonyme>: Changer de pseudonyme \n - /JOIN <Salon>: Rejoindre un serveur \n - /PART : Quitter le salon \n - /LIST : Lister les salons ouverts \n - /HELP : Afficher la liste des commandes possibles\n");
+    strcpy(ret.salonCible,"NULL");
+    return ret;
 }
 
+Message erreurCommande(){
+    Message ret;
+    strcpy(ret.salonCible,"NULL");
+    strcpy(ret.message,"ERR_CMDUNKNOWN");
+    return ret;
+}
 
 void envoyerMessageClient(struct Clients client,struct Message msg){
     sendto(sd,&msg,sizeof(Message),0, (struct sockaddr *)&client.socket_addr, sizeof(client.socket_addr));
