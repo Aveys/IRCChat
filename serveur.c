@@ -105,6 +105,7 @@ void *thread_client(void *arguments){
 }
 
 char* listSalon(){
+
 }
 
 char* listCommandes(){
