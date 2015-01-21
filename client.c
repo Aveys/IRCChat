@@ -21,9 +21,10 @@ void clean(const char *buffer, FILE *fp);
 int sckt = -1;
 
 /**
-* Structure de gestion d'adresses cliente et serveur
+* Structures de gestion d'adresses cliente et serveur
 */
 struct sockaddr_in client_addr, serv_addr;
+socklen_t addr_len;
 
 /**
 * Thread d'écoute serveur
@@ -48,29 +49,49 @@ void _log(char * message) {
 * Envoie une communication avec le serveur avec un thread non bloquant
 */
 void * thread_communicate(void * var) {
+    fd_set rfds;
+    struct timeval tv;
+    int retval;
+
     char * data = (char *) var;
     char buffer[255];
     char target[3];
 
-    if (send(sckt, data, strlen(data) + 1, 0)) {
+    FD_ZERO(&rfds);
+    FD_SET(sckt, &rfds);
+
+    tv.tv_sec = 5;
+    tv.tv_usec = 0;
+
+    if (sendto(sckt, data, strlen(data) + 1, 0, (struct sockaddr *)&serv_addr, addr_len)) {
         perror("sendto");
         return NULL;
     }
 
-    if (read(sckt, buffer, MAX_MESSAGE) > 0) {
-        strncpy(target, buffer, 3);
+    retval = select(sckt + 1, &rfds, NULL, NULL, &tv);
 
-        if (strcmp("ACK", buffer) == 0) {
-            return NULL;
+    if (retval == -1) {
+        perror("select()");
+    } else if (retval) {
+        if (FD_ISSET(sckt + 1, &rfds)) {
+            if (recvfrom(sckt, buffer, MAX_MESSAGE, 0, (struct sockaddr *) &serv_addr, &addr_len) > 0) {
+                strncpy(target, buffer, 3);
+
+                if (strcmp("ACK", buffer) == 0) {
+                    return NULL;
+                }
+            }
         }
+    } else {
+        _log("# Message non reçu par le serveur... Le renvoyer ? (Y/n)");
     }
 
     return NULL;
 }
 
 /**
-* Engage une communication
-*/
+ * Engage une communication
+ */
 void communicate(char * message) {
     pthread_mutex_lock(&communication_mutex);
 
@@ -80,15 +101,20 @@ void communicate(char * message) {
 }
 
 /**
-* Gère la connexion à un serveur de communication
-*
-* @var address  Adresse IP du serveur
-* @var port     Port du serveur
-*/
+ * Gère la connexion à un serveur de communication
+ *
+ * @var address  Adresse IP du serveur
+ * @var port     Port du serveur
+ */
 int server(char * address, char * port) {
     char * message = "CONNECT";
 
     if ((sckt = socket(PF_INET, SOCK_DGRAM, 0)) == -1) {
+        return 1;
+    }
+
+    if (bind(sckt,(struct sockaddr *) &client_addr, sizeof client_addr) == -1) {
+        perror("bind");
         return 1;
     }
 
@@ -99,10 +125,7 @@ int server(char * address, char * port) {
 
     serv_addr.sin_port = htons(atoi(port));
 
-    if (connect(sckt, (struct sockaddr *) &serv_addr, sizeof serv_addr) == 1) {
-        perror("connect");
-        return 1;
-    }
+    addr_len = sizeof(serv_addr);
 
     communicate(message);
 
@@ -110,8 +133,8 @@ int server(char * address, char * port) {
 }
 
 /**
-* Fonction pour quitter le serveur
-*/
+ * Fonction pour quitter le serveur
+ */
 void quit(void) {
     if (sckt == -1) {
         pthread_join(ecoute, NULL);
