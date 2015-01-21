@@ -32,15 +32,29 @@ pthread_t ecoute;
 */
 Communication * communications;
 
+void _log(char * message) {
+    printf("%s\n", message);
+}
+
 /**
 * Thread d'écoute serveur
 */
 void * thread_process(void) {
     char * buffer;
+    char target[3];
     int n;
 
     if ((n = read(sckt, buffer, MAX_MESSAGE)) > 0) {
         printf("Server: %s\n", buffer);
+
+        strncpy(target, buffer, 3);
+
+        // Si c'est un message d'acquittement
+        if (strcmp(target, "ACK")) {
+
+        } else {
+
+        }
     }
 }
 
