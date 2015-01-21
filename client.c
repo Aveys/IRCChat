@@ -81,21 +81,11 @@ void * thread_process(void * var) {
 * @var port     Port du serveur
 */
 int server(char * address, char * port) {
-    if (sckt == -1) {
-        pthread_exit(ecoute);
-        close(sckt);
-    }
+    quit();
 
     if ((sckt = socket(PF_INET, SOCK_DGRAM, 0)) == -1) {
         return 1;
     }
-
-    client_addr.sin_family = AF_INET;
-    client_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    client_addr.sin_port        = htons(0);
-
-    // Fill server address structure
-    serv_addr.sin_family = AF_INET;
 
     if (inet_aton(address, &(serv_addr.sin_addr)) == 0) {
         printf("Invalid IP address format <%s>\n", address);
@@ -125,16 +115,31 @@ int communicate(char * data) {
     return 0;
 }
 
+/**
+* Fonction pour quitter le serveur
+*/
+void quit(void) {
+    if (sckt == -1) {
+        pthread_join(ecoute, NULL);
+        close(sckt);
+    }
+}
+
 int main(int argc, char *argv[]) {
     char * input;
-    char * token;
+    char * token = "NOQUIT";
     char * address;
     char * port;
     char input2[MAX_MESSAGE];
 
+    client_addr.sin_family = AF_INET;
+    client_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    client_addr.sin_port        = htons(0);
+    serv_addr.sin_family = AF_INET;
+
     puts("## Bienvenue ##");
 
-    for (;;) {
+    while (strcmp(token, "QUIT") != 0) {
         puts("## Entrez une commande (/HELP pour recevoir de l'aide)");
 
         fgets(input2, sizeof(input2), stdin);
@@ -160,6 +165,8 @@ int main(int argc, char *argv[]) {
             }
         }
     }
+
+    quit();
 
     return 0;
 }
