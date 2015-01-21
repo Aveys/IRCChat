@@ -162,6 +162,7 @@ struct Message erreurCommande(){
 void envoyerMessageClient(struct Client client,struct Message msg){
     sendto(sd,&msg,sizeof(Message),0, (struct sockaddr *)&client.socket_addr, sizeof(client.socket_addr));
 }
+// Envoi un message à tous les utilisateurs d'un salon
 void envoyerMessageSalon(struct Salon salon, struct Message msg){
     struct Client c;
     for (int i = 0; i < salon.nbClient; i++) {
@@ -169,6 +170,7 @@ void envoyerMessageSalon(struct Salon salon, struct Message msg){
         envoyerMessageClient(c,msg);
     }
 }
+
 void* realloc_s (void **ptr, size_t taille){
     void *ptr_realloc = realloc(*ptr, taille);
 
