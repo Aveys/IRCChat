@@ -13,7 +13,9 @@
 
 
 struct Client clients[10];
+struct Salon salons[10];
 int nbClients=0;
+int nbSalons=0;
 int sd;
 
 int main(int argc, char *argv[]) {
@@ -93,10 +95,11 @@ void *thread_client(void *arguments){
         }
         else if(strcmp(msg.message,"LIST")==0){
             fputs("USER a demandé la liste des salons ouvert",stdout);
-            //listSalon();
+            //listeSalon();
         }
         else if(strcmp(msg.message,"HELP")==0){
             fputs("USER a demandé de l'aide",stdout);
+            listeCommandes();
         }
         else{
             fputs("Commande non reconnue",stdout);
@@ -105,12 +108,22 @@ void *thread_client(void *arguments){
     }
 }
 
-char* listSalon(){
-
+char* listeSalon(){
+    char* ret ="ACK_LIST";
+    for(i=0;i<nbSalons;i++){
+        strcat(ret," ");
+        strcat(ret,salons.name);
+    }
+    return ret;
 }
 
-char* listCommandes(){
-    char* ret="Commande : \n - /SERVER <@IP>: Demander la connexion au serveur \n - /NICK <pseudonyme>: Changer de pseudonyme \n - /JOIN <Salon>: Rejoindre un serveur \n - /PART : Quitter le salon \n - /LIST : Lister les salons ouverts \n - /HELP : Afficher la liste des commandes possibles\n";
+char* listeCommandes(){
+    char* ret="ACK_HELP /SERVER <@IP>: Demander la connexion au serveur \n - /NICK <pseudonyme>: Changer de pseudonyme \n - /JOIN <Salon>: Rejoindre un serveur \n - /PART : Quitter le salon \n - /LIST : Lister les salons ouverts \n - /HELP : Afficher la liste des commandes possibles\n";
+}
+
+
+void envoyerMessageClient(struct Clients client,struct Message msg){
+    sendto(sd,&msg,sizeof(Message),0, (struct sockaddr *)&client.socket_addr, sizeof(client.socket_addr));
 }
 
 /*
