@@ -1,9 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/socket.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
-#include <sys/wait.h>
 #include <netinet/in.h>
 #include <regex.h>
 #include <arpa/inet.h>
@@ -43,7 +40,6 @@ pthread_mutex_t * communication_mutex;
 /**
 * Communications
 */
-int shmid;
 Communication * communications;
 
 void _log(char * message) {
@@ -85,11 +81,21 @@ void * thread_process(void * var) {
 * @var port     Port du serveur
 */
 int server(char * address, char * port) {
-    quit();
+    if (sckt == -1) {
+        pthread_exit(ecoute);
+        close(sckt);
+    }
 
     if ((sckt = socket(PF_INET, SOCK_DGRAM, 0)) == -1) {
         return 1;
     }
+
+    client_addr.sin_family = AF_INET;
+    client_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    client_addr.sin_port        = htons(0);
+
+    // Fill server address structure
+    serv_addr.sin_family = AF_INET;
 
     if (inet_aton(address, &(serv_addr.sin_addr)) == 0) {
         printf("Invalid IP address format <%s>\n", address);
@@ -108,42 +114,55 @@ int server(char * address, char * port) {
 }
 
 /**
-* Envoie une communication avec le serveur
-*/
+ * Envoie une communication avec le serveur
+ */
+
+void enqueue(Communication **p_queue, char * data) {
+    Communication *p_nouveau = malloc(sizeof *p_nouveau);
+    if (p_nouveau != NULL) {
+        p_nouveau->suivant = NULL;
+        p_nouveau->message = data;
+        p_nouveau->acquitted = 0;
+        if (*p_queue == NULL) {
+            *p_queue = p_nouveau;
+        } else {
+            Communication *p_tmp = *p_queue;
+            while (p_tmp->suivant != NULL) {
+                p_tmp = p_tmp->suivant;
+            }
+            p_tmp->suivant = p_nouveau;
+        }
+    }
+}
+
 int communicate(char * data) {
     if (sendto(sckt, data, strlen(data) + 1, 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
         perror("sendto");
         return 1;
     }
 
-    return 0;
-}
+    communications = enqueue(communications, data);
 
-/**
-* Fonction pour quitter le serveur
-*/
-void quit(void) {
-    if (sckt == -1) {
-        pthread_join(ecoute, NULL);
-        close(sckt);
-    }
+
+    return 0;
 }
 
 int main(int argc, char *argv[]) {
     char * input;
-    char * token = "NOQUIT";
+    char * token;
     char * address;
     char * port;
     char input2[MAX_MESSAGE];
 
-    client_addr.sin_family = AF_INET;
-    client_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    client_addr.sin_port        = htons(0);
-    serv_addr.sin_family = AF_INET;
+
+    // INIT QUEUE
+
+    queue = malloc(sizeof (Communication));
+    queue->suivant = NULL;
 
     puts("## Bienvenue ##");
 
-    while (strcmp(token, "QUIT") != 0) {
+    for (;;) {
         puts("## Entrez une commande (/HELP pour recevoir de l'aide)");
 
         fgets(input2, sizeof(input2), stdin);
@@ -169,8 +188,6 @@ int main(int argc, char *argv[]) {
             }
         }
     }
-
-    quit();
 
     return 0;
 }

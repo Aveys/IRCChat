@@ -23,6 +23,6 @@ struct Message {
 typedef struct Communication {
     char message[MAX_MESSAGE];
     int acquitted;
-    struct Communication * next;
+    struct Communication * suivant;
 } Communication;
 
