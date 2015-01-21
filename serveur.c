@@ -108,10 +108,20 @@ void *thread_client(void *arguments){
             if (strcmp(msg.message, "NICK") == 0) {
 
             }
+            else if (strcmp(msg.message, "MESSAGE") == 0) {
+
+            }
             else if (strcmp(msg.message, "JOIN") == 0) {
                 fputs("USER a demande à rejoindre SALON", stdout);
+                char* nomSalon;
+                char tab[2][MAX_NAME]; // [][]
+                tab = strtok(msg," "); // [JOIN][NomSalon]
+                nomSalon= tab[1];  // On récupere le nom du salon
+                msg = joindreSalon(nomSalon, moi);
+                envoyerMessageClient(moi, msg);
             }
             else if (strcmp(msg.message, "PART") == 0) {
+                msg = quitterSalon();
                 fputs("USER a quitté le SALON", stdout);
             }
             else if (strcmp(msg.message, "QUIT") == 0) {
@@ -135,7 +145,6 @@ void *thread_client(void *arguments){
         }
     }
 }
-
 struct Message listeSalon(){
     struct Message ret;
     strcpy(ret.salonCible,"NULL");
@@ -161,9 +170,35 @@ struct Message erreurCommande(){
     return ret;
 }
 
-Struct Message joinSrv(char* nomSalon){
+
+struct Message quitterSalon(char* nomSalon,Client c){
+//SI un seul client dans le salon, on supprime le salon
+    int existe=0;
+    Salon s;
+    for(i=0;i<nbSalons;i++){
+        if(nomSalon=salons->name){
+            existe=1;
+            break;
+        }
+    }
+    if(existe){
+        s=salons[i];
+    }
+    if(s.nbClient<=1){
+        //SUPPRIMER SALON
+    }else{
+    //Suppression de l'utilisateur dans la liste de client du salon
+    }
+
+//Suppression du client de la liste client associé au salon
+
+}
+
+
+struct Message joindreSalon(char* nomSalon,Client c){
     //Vérifier si le salon existe
     int existe=0;
+    Salon s;
     for(i=0;i<nbSalons;i++){
         if(nomSalon=salons->name){
             existe=1;
@@ -172,16 +207,31 @@ Struct Message joinSrv(char* nomSalon){
      }
     //SI n'existe pas ALORS création du salon
     if(!existe){
-        Salon s;
         s.name=nomSalon;
         s.clients="NOM CLIENT";
-        
+        realloc_s(&salons, sizeof(salons)*(sizeof(s)+1));
+        nbSalons++;
+        salons[nbSalons]=s;
+    }else{
+        //Affectation du salon trouvé à la structure salon
+        s=salons[i];
     }
-    strcat(ret.message," ");
-    strcat(ret.message,salons.name);
-
     //Ajout du client au salon
+    realloc_s(&s->clients, sizeof(s->clients)*(sizeof(c)+1));
+    s->nbClients++;
+    s->clients[nbClients]=c;
+
     //Informer autres clients
+    struct Message ret;
+    strcpy(ret.salonCible,"");
+    strcpy(ret.message,"MESSAGE ");
+    srtcat(ret.message,c.pseudo);
+    srtcat(ret.message," s'est connecté"); // MESSAGE NomClient s'est connecté
+    envoyerMessageSalon(s, ret); // Envoi du message à tous les clients du salon
+
+    strcpy(ret.message,"ACK_JOIN"); // Message de retour client
+    strcpy(ret.salonCible,"NULL");
+    return ret;
 }
 
 void envoyerMessageClient(struct Client client,struct Message msg){
