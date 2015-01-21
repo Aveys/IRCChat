@@ -14,10 +14,16 @@ typedef struct Salon {
     Client * clients;
 } Salon;
 
-struct Message{
+struct Message {
     char message[MAX_MESSAGE];
     char salonCible[MAX_NAME];
 } Message;
+
+typedef struct Communication {
+    char message[MAX_MESSAGE];
+    int acquitted;
+    struct Communication * next;
+} Communication;
 
 typedef enum Commande Commande;
 enum Commande

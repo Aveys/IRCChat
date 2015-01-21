@@ -11,7 +11,14 @@
 
 void clean(const char *buffer, FILE *fp);
 
-int sckt = -1, i;
+/**
+* @var socket client
+*/
+int sckt = -1;
+
+/**
+* Structure de gestion d'adresses cliente et serveur
+*/
 struct sockaddr_in client_addr, serv_addr;
 
 /**
@@ -37,11 +44,16 @@ int server(char * address, char * port) {
         return 1;
     }
 
-    serv_addr.sin_port = htons(port);
+    serv_addr.sin_port = htons(atoi(port));
+
+    if (connect(sckt, (struct sockaddr *) &serv_addr, sizeof serv_addr) == 1) {
+        perror("connect");
+        return 1;
+    }
 }
 
 /**
-*
+* Envoie une communication avec le serveur
 */
 int communicate(char * data) {
     if (sendto(sckt, data, strlen(data) + 1, 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
@@ -52,9 +64,7 @@ int communicate(char * data) {
     return 0;
 }
 
-int main(int argc, char *argv[]){
-    char command[MAX_MESSAGE];
-    char message[MAX_MESSAGE];
+int main(int argc, char *argv[]) {
     char * input;
     char * token;
     char * address;
@@ -84,7 +94,7 @@ int main(int argc, char *argv[]){
 
             }
         } else {
-            if (sckt && communicate(input)) {
+            if (sckt != -1 && communicate(input)) {
 
             }
         }
