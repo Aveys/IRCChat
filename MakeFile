@@ -1,8 +1,8 @@
 CFLAGS= -Wall -Wextra -O2 -g -lpthread
-all: client server
-server: server.o
+all: client serveur
+serveur: serveur.o
 	gcc $^ -o $@
 client: client.o
 	gcc $^ -o $@
 clean:
-	@rm *.o client server
+	@rm *.o client serveur
