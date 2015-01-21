@@ -21,11 +21,6 @@ void clean(const char *buffer, FILE *fp);
 int sckt = -1;
 
 /**
-* Mutex pour accès aux communications
-*/
-int communications_mutex;
-
-/**
 * Structure de gestion d'adresses cliente et serveur
 */
 struct sockaddr_in client_addr, serv_addr;
@@ -38,7 +33,7 @@ pthread_t ecoute;
 /**
 * Mutex d'accès aux ressources
 */
-pthread_mutex_t * communication_mutex;
+pthread_mutex_t communication_mutex;
 
 /**
 * Communications
@@ -47,33 +42,33 @@ int shmid;
 Communication * communications;
 
 void _log(char * message) {
-    printf("%s\n", message);
+    puts(message);
 }
 
 /**
-* Thread d'écoute serveur
+* Envoie une communication avec le serveur avec un thread non bloquant
 */
-void * thread_process(void * var) {
-    char * buffer;
+void * thread_communicate(void * var) {
+    char * data = (char *) var;
+    char buffer[255];
     char target[3];
-    int n;
 
-    if ((n = read(sckt, buffer, MAX_MESSAGE)) > 0) {
-        printf("Server: %s\n", buffer);
+    pthread_mutex_lock(&communication_mutex);
 
+    if (send(sckt, data, strlen(data) + 1, 0)) {
+        perror("sendto");
+        return NULL;
+    }
+
+    if (read(sckt, buffer, MAX_MESSAGE) > 0) {
         strncpy(target, buffer, 3);
 
-        pthread_mutex_lock(communication_mutex);
-
-        // Si c'est un message d'acquittement
-        if (strcmp(target, "ACK")) {
-
-        } else {
-            return buffer;
+        if (strcmp("ACK", buffer) == 0) {
+            pthread_exit(NULL);
         }
-
-        pthread_mutex_unlock(communication_mutex);
     }
+
+    pthread_mutex_unlock(&communication_mutex);
 
     return NULL;
 }
@@ -85,7 +80,7 @@ void * thread_process(void * var) {
 * @var port     Port du serveur
 */
 int server(char * address, char * port) {
-    quit();
+    char * message = "CONNECT";
 
     if ((sckt = socket(PF_INET, SOCK_DGRAM, 0)) == -1) {
         return 1;
@@ -103,20 +98,10 @@ int server(char * address, char * port) {
         return 1;
     }
 
-    pthread_mutex_init(communication_mutex, NULL);
-    pthread_create(&ecoute, NULL, thread_process, NULL);
-}
+    pthread_mutex_init(&communication_mutex, NULL);
+    pthread_create(&ecoute, NULL, thread_communicate, message);
 
-/**
-* Envoie une communication avec le serveur
-*/
-int communicate(char * data) {
-    if (sendto(sckt, data, strlen(data) + 1, 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
-        perror("sendto");
-        return 1;
-    }
-
-    return 0;
+    free(message);
 }
 
 /**
@@ -125,7 +110,10 @@ int communicate(char * data) {
 void quit(void) {
     if (sckt == -1) {
         pthread_join(ecoute, NULL);
+
+
         close(sckt);
+        sckt = -1;
     }
 }
 
@@ -141,10 +129,12 @@ int main(int argc, char *argv[]) {
     client_addr.sin_port        = htons(0);
     serv_addr.sin_family = AF_INET;
 
-    puts("## Bienvenue ##");
+    _log("## Bienvenue ##");
+
+    shmid = shmget(IPC_PRIVATE, sizeof(Communication), IPC_CREAT | 0666);
 
     while (strcmp(token, "QUIT") != 0) {
-        puts("## Entrez une commande (/HELP pour recevoir de l'aide)");
+        _log("## Entrez une commande (/HELP pour recevoir de l'aide)");
 
         fgets(input2, sizeof(input2), stdin);
         clean(input2, stdin);
@@ -168,9 +158,12 @@ int main(int argc, char *argv[]) {
 
             }
         }
+
+        free(input);
     }
 
-    quit();
+    _log("Exiting the application...");
+    pthread_join(ecoute, NULL);
 
     return 0;
 }
