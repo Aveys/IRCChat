@@ -17,10 +17,12 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <stdarg.h>
+#include <Foundation/Foundation.h>
 
 #include "protocole.h"
 
 void clean(const char *buffer, FILE *fp);
+int call_function(const char *name, char * param);
 
 /**
 * Structure d'une réponse de thread
@@ -68,11 +70,12 @@ void _log(char * message, ...) {
 */
 void * thread_communicate(void * var) {
     Response * response;
+    struct Message message;
     fd_set rfds;
     struct timeval tv;
     int retval;
 
-    char * data = (char *) var;
+    strcpy(message.message, (char *) var);
     char buffer[255];
     char target[3];
 
@@ -82,7 +85,7 @@ void * thread_communicate(void * var) {
     tv.tv_sec = 5;
     tv.tv_usec = 0;
 
-    if (sendto(sckt, data, strlen(data) + 1, 0, (struct sockaddr *)&serv_addr, addr_len)) {
+    if (sendto(sckt, &message, sizeof(message) + 1, 0, (struct sockaddr *)&serv_addr, addr_len)) {
         perror("sendto");
         return NULL;
     }
@@ -92,10 +95,11 @@ void * thread_communicate(void * var) {
     if (response->code == -1) {
         perror("select()");
     } else if (response->code && FD_ISSET(sckt + 1, &rfds)) {
-        if (recvfrom(sckt, response->value, MAX_MESSAGE, 0, (struct sockaddr *) &serv_addr, &addr_len) > 0) {
-            strncpy(target, response->value, 3);
+        if (recvfrom(sckt, &message, sizeof(Message), 0, (struct sockaddr *) &serv_addr, &addr_len) > 0) {
+            strncpy(target, message.message, 3);
 
             if (strcmp("ACK", buffer) == 0) {
+                strcpy(response->value, message.message);
                 return response;
             }
         }
@@ -131,7 +135,7 @@ void communicate(char * command, char * message) {
             communicate(command, message);
         }
     } else {
-        call_function(command, response->)
+        call_function(command, response->value);
     }
 
     free(response);
