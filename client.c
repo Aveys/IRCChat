@@ -1,5 +1,3 @@
-#include "protocole.h"
-
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/socket.h>
@@ -15,9 +13,14 @@
 void clean(const char *buffer, FILE *fp);
 
 /**
-* @var socket client
+* Socket client
 */
 int sckt = -1;
+
+/**
+* Mutex pour accès aux communications
+*/
+int communications_mutex;
 
 /**
 * Structure de gestion d'adresses cliente et serveur
@@ -28,6 +31,11 @@ struct sockaddr_in client_addr, serv_addr;
 * Thread d'écoute serveur
 */
 pthread_t ecoute;
+
+/**
+* Mutex d'accès aux ressources
+*/
+pthread_mutex_t * communication_mutex;
 
 /**
 * Communications
@@ -41,7 +49,7 @@ void _log(char * message) {
 /**
 * Thread d'écoute serveur
 */
-void * thread_process(void) {
+void * thread_process(void * var) {
     char * buffer;
     char target[3];
     int n;
@@ -51,13 +59,19 @@ void * thread_process(void) {
 
         strncpy(target, buffer, 3);
 
+        pthread_mutex_lock(communication_mutex);
+
         // Si c'est un message d'acquittement
         if (strcmp(target, "ACK")) {
 
         } else {
-
+            return buffer;
         }
+
+        pthread_mutex_unlock(communication_mutex);
     }
+
+    return NULL;
 }
 
 /**
@@ -67,6 +81,11 @@ void * thread_process(void) {
 * @var port     Port du serveur
 */
 int server(char * address, char * port) {
+    if (sckt == -1) {
+        pthread_exit(ecoute);
+        close(sckt);
+    }
+
     if ((sckt = socket(PF_INET, SOCK_DGRAM, 0)) == -1) {
         return 1;
     }
@@ -90,6 +109,7 @@ int server(char * address, char * port) {
         return 1;
     }
 
+    pthread_mutex_init(communication_mutex, NULL);
     pthread_create(&ecoute, NULL, thread_process, NULL);
 }
 
@@ -116,7 +136,7 @@ void enqueue(Communication **p_queue, char * data) {
 }
 
 int communicate(char * data) {
-    if (sendto(sckt, data, strlen(data) + 1, 0, (struct sockaddr *) &serv_addr, sizeof (serv_addr)) == -1) {
+    if (sendto(sckt, data, strlen(data) + 1, 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
         perror("sendto");
         return 1;
     }

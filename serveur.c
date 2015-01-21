@@ -12,12 +12,14 @@
 #define PORT_SERVEUR 1500
 
 
-struct Client clients[10];
+struct Client *clients=NULL;//tableau des clients connecté
 int nbClients=0;
+struct Salon *salons=NULL;//tableau des salons crées
+int nbSalons=0;
 int sd;
 
 int main(int argc, char *argv[]) {
-
+    clients = malloc(sizeof(Client));
     pthread_t thread;
     int n;
     socklen_t addr_len;
@@ -61,14 +63,17 @@ int main(int argc, char *argv[]) {
 void *thread_client(void *arguments){
     int alive = 1;
     int n;
+
     fputs("Dans le thread\n",stdout);
     struct Args_Thread *args = arguments;
 
     struct Client moi;
     strcpy(moi.pseudo,"Anon");
     moi.socket_addr=args->addr;
-    clients[nbClients]=moi;
     nbClients++;
+    clients = malloc(nbClients* sizeof(Client));
+    clients[nbClients]=moi;
+
 
     struct Message msg;
     strcpy(msg.message,"ACK_CONNECTED");
@@ -80,7 +85,7 @@ void *thread_client(void *arguments){
             perror("recvfrom");
 
         if(strcmp(msg.message,"NICK")==0){
-
+            changeNick(moi,)
         }
         else if(strcmp(msg.message,"JOIN")==0){
             fputs("USER a demande à rejoindre SALON",stdout);
@@ -112,7 +117,11 @@ char* listCommandes(){
     char* ret="Commande : \n - /SERVER <@IP>: Demander la connexion au serveur \n - /NICK <pseudonyme>: Changer de pseudonyme \n - /JOIN <Salon>: Rejoindre un serveur \n - /PART : Quitter le salon \n - /LIST : Lister les salons ouverts \n - /HELP : Afficher la liste des commandes possibles\n";
 }
 void envoyerMessageSalon(struct Salon salon, struct Message msg){
-
+    struct Client c;
+    for (int i = 0; i < salon.nbClient; i++) {
+        c=salon.clients[i];
+        envoyerMessageClient(c,msg);
+    }
 }
 /*
 int startsWith(const char *pre, const char *str)
