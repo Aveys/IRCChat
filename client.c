@@ -21,6 +21,7 @@
 #include "protocole.h"
 
 void clean(const char *buffer, FILE *fp);
+int call_function(const char *name, char * param);
 
 /**
 * Structure d'une réponse de thread
@@ -63,16 +64,28 @@ void _log(char * message, ...) {
     va_end(argptr);
 }
 
+void _debug(char * message, ...) {
+    puts("# DEBUG");
+    va_list argptr;
+    va_start(argptr, message);
+    vfprintf(stderr, message, argptr);
+    va_end(argptr);
+}
+
 /**
 * Envoie une communication avec le serveur avec un thread non bloquant
 */
 void * thread_communicate(void * var) {
-    Response * response;
+    Response * response = &(Response) {
+        .code = 0
+    };
+
+    struct Message message;
     fd_set rfds;
     struct timeval tv;
     int retval;
 
-    char * data = (char *) var;
+    strcpy(message.message, (char *) var);
     char buffer[255];
     char target[3];
 
@@ -82,20 +95,22 @@ void * thread_communicate(void * var) {
     tv.tv_sec = 5;
     tv.tv_usec = 0;
 
-    if (sendto(sckt, data, strlen(data) + 1, 0, (struct sockaddr *)&serv_addr, addr_len)) {
+    if (sendto(sckt, &message, sizeof(message) + 1, 0, (struct sockaddr *)&serv_addr, addr_len)) {
         perror("sendto");
         return NULL;
     }
 
+    // Timeout de 5 secondes pour la réception d'un ACK
     response->code = select(sckt + 1, &rfds, NULL, NULL, &tv);
 
     if (response->code == -1) {
         perror("select()");
     } else if (response->code && FD_ISSET(sckt + 1, &rfds)) {
-        if (recvfrom(sckt, response->value, MAX_MESSAGE, 0, (struct sockaddr *) &serv_addr, &addr_len) > 0) {
-            strncpy(target, response->value, 3);
+        if (recvfrom(sckt, &message, sizeof(Message), 0, (struct sockaddr *) &serv_addr, &addr_len) > 0) {
+            strncpy(target, message.message, 3);
 
             if (strcmp("ACK", buffer) == 0) {
+                strcpy(response->value, message.message);
                 return response;
             }
         }
@@ -131,10 +146,8 @@ void communicate(char * command, char * message) {
             communicate(command, message);
         }
     } else {
-        call_function(command, response->)
+        call_function(command, response->value);
     }
-
-    free(response);
 }
 
 /**
@@ -187,27 +200,27 @@ void quit(void) {
 * Handler d'un envoi de message Join
 */
 void _joinHandler(char * var) {
-
+    _debug("JOIN");
 }
 
 void _partHandler(char * var) {
-
+    _debug("PART");
 }
 
 void _quitHandler(char * var) {
-
+    _debug("QUIT");
 }
 
 void _listHandler(char * var) {
-
+    _debug("LIST");
 }
 
 void _nickHandler(char * var) {
-
+    _debug("NICK");
 }
 
 void _helpHandler(char * var) {
-
+    _debug("HELP");
 }
 
 /**
@@ -217,12 +230,12 @@ const static struct {
     const char *name;
     void (*function)(char *);
 } function_map [] = {
-        {"join", _joinHandler },
-        {"part", _partHandler },
-        {"quit", _quitHandler },
-        {"list", _listHandler },
-        {"help", _helpHandler },
-        {"nick", _nickHandler }
+        {"JOIN", _joinHandler },
+        {"PART", _partHandler },
+        {"QUIT", _quitHandler },
+        {"LIST", _listHandler },
+        {"HELP", _helpHandler },
+        {"NICK", _nickHandler }
 };
 
 int main(int argc, char *argv[]) {
@@ -263,12 +276,16 @@ int main(int argc, char *argv[]) {
             } else {
                 _log("# Connexion au serveur %s port %s échouée\n", address, port);
             }
+
+            free(address);
+            free(port);
         } else {
             if (sckt != -1) {
-                communicate(command, input);
+                call_function(command, input);
             }
         }
 
+        free(command);
         free(input);
     }
 
