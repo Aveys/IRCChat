@@ -17,7 +17,6 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <stdarg.h>
-#include <Foundation/Foundation.h>
 
 #include "protocole.h"
 
@@ -59,6 +58,14 @@ pthread_mutex_t communication_mutex;
 char * nickname;
 
 void _log(char * message, ...) {
+    va_list argptr;
+    va_start(argptr, message);
+    vfprintf(stderr, message, argptr);
+    va_end(argptr);
+}
+
+void _debug(char * message, ...) {
+    puts("# DEBUG");
     va_list argptr;
     va_start(argptr, message);
     vfprintf(stderr, message, argptr);
@@ -141,8 +148,6 @@ void communicate(char * command, char * message) {
     } else {
         call_function(command, response->value);
     }
-
-    free(response);
 }
 
 /**
@@ -195,27 +200,27 @@ void quit(void) {
 * Handler d'un envoi de message Join
 */
 void _joinHandler(char * var) {
-
+    _debug("JOIN");
 }
 
 void _partHandler(char * var) {
-
+    _debug("PART");
 }
 
 void _quitHandler(char * var) {
-
+    _debug("QUIT");
 }
 
 void _listHandler(char * var) {
-
+    _debug("LIST");
 }
 
 void _nickHandler(char * var) {
-
+    _debug("NICK");
 }
 
 void _helpHandler(char * var) {
-
+    _debug("HELP");
 }
 
 /**
@@ -225,12 +230,12 @@ const static struct {
     const char *name;
     void (*function)(char *);
 } function_map [] = {
-        {"join", _joinHandler },
-        {"part", _partHandler },
-        {"quit", _quitHandler },
-        {"list", _listHandler },
-        {"help", _helpHandler },
-        {"nick", _nickHandler }
+        {"JOIN", _joinHandler },
+        {"PART", _partHandler },
+        {"QUIT", _quitHandler },
+        {"LIST", _listHandler },
+        {"HELP", _helpHandler },
+        {"NICK", _nickHandler }
 };
 
 int main(int argc, char *argv[]) {
@@ -271,12 +276,16 @@ int main(int argc, char *argv[]) {
             } else {
                 _log("# Connexion au serveur %s port %s échouée\n", address, port);
             }
+
+            free(address);
+            free(port);
         } else {
             if (sckt != -1) {
-                communicate(command, input);
+                call_function(command, input);
             }
         }
 
+        free(command);
         free(input);
     }
 
