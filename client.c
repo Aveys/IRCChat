@@ -74,6 +74,17 @@ void * thread_communicate(void * var) {
 }
 
 /**
+* Engage une communication
+*/
+void communicate(char * message) {
+    pthread_mutex_lock(&communication_mutex);
+
+    pthread_create(&ecoute, NULL, thread_communicate, message);
+
+    pthread_mutex_unlock(&communication_mutex);
+}
+
+/**
 * Gère la connexion à un serveur de communication
 *
 * @var address  Adresse IP du serveur
@@ -98,8 +109,7 @@ int server(char * address, char * port) {
         return 1;
     }
 
-    pthread_mutex_init(&communication_mutex, NULL);
-    pthread_create(&ecoute, NULL, thread_communicate, message);
+    communicate(message);
 
     free(message);
 }
@@ -131,7 +141,7 @@ int main(int argc, char *argv[]) {
 
     _log("## Bienvenue ##");
 
-    shmid = shmget(IPC_PRIVATE, sizeof(Communication), IPC_CREAT | 0666);
+    pthread_mutex_init(&communication_mutex, NULL);
 
     while (strcmp(token, "QUIT") != 0) {
         _log("## Entrez une commande (/HELP pour recevoir de l'aide)");
@@ -154,8 +164,8 @@ int main(int argc, char *argv[]) {
 
             }
         } else {
-            if (sckt != -1 && communicate(input)) {
-
+            if (sckt != -1) {
+                communicate(input);
             }
         }
 
