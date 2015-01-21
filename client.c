@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/wait.h>
 #include <netinet/in.h>
 #include <regex.h>
 #include <arpa/inet.h>
@@ -40,6 +43,7 @@ pthread_mutex_t * communication_mutex;
 /**
 * Communications
 */
+int shmid;
 Communication * communications;
 
 void _log(char * message) {
