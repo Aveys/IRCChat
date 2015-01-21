@@ -10,35 +10,37 @@
 #include <stdlib.h>
 #include <pthread.h>
 
+#include "protocole.h"
+
 void clean(const char *buffer, FILE *fp);
 
 /**
- * @var socket client
- */
+* @var socket client
+*/
 int sckt = -1;
 
 /**
- * Structure de gestion d'adresses cliente et serveur
- */
-
+* Structure de gestion d'adresses cliente et serveur
+*/
 struct sockaddr_in client_addr, serv_addr;
-Communication *communications;
+
 /**
- * Thread d'écoute serveur
- */
+* Thread d'écoute serveur
+*/
 pthread_t ecoute;
 
 /**
- * Communications
- */
+* Communications
+*/
+Communication * communications;
 
 void _log(char * message) {
     printf("%s\n", message);
 }
 
 /**
- * Thread d'écoute serveur
- */
+* Thread d'écoute serveur
+*/
 void * thread_process(void) {
     char * buffer;
     char target[3];
@@ -59,11 +61,11 @@ void * thread_process(void) {
 }
 
 /**
- * Gère la connexion à un serveur de communication
- *
- * @var address  Adresse IP du serveur
- * @var port     Port du serveur
- */
+* Gère la connexion à un serveur de communication
+*
+* @var address  Adresse IP du serveur
+* @var port     Port du serveur
+*/
 int server(char * address, char * port) {
     if ((sckt = socket(PF_INET, SOCK_DGRAM, 0)) == -1) {
         return 1;
@@ -71,7 +73,7 @@ int server(char * address, char * port) {
 
     client_addr.sin_family = AF_INET;
     client_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    client_addr.sin_port = htons(0);
+    client_addr.sin_port        = htons(0);
 
     // Fill server address structure
     serv_addr.sin_family = AF_INET;
@@ -118,7 +120,6 @@ int communicate(char * data) {
         perror("sendto");
         return 1;
     }
-    // IF FIRST
 
     communications = enqueue(communications, data);
 
@@ -144,7 +145,7 @@ int main(int argc, char *argv[]) {
     for (;;) {
         puts("## Entrez une commande (/HELP pour recevoir de l'aide)");
 
-        fgets(input2, sizeof (input2), stdin);
+        fgets(input2, sizeof(input2), stdin);
         clean(input2, stdin);
 
         input = strdup(input2);
@@ -175,10 +176,11 @@ int main(int argc, char *argv[]) {
  * Supprime le \n du buffer et de stdin
  */
 void clean(const char *buffer, FILE *fp) {
-    char *p = strchr(buffer, '\n');
+    char *p = strchr(buffer,'\n');
     if (p != NULL)
         *p = 0;
-    else {
+    else
+    {
         int c;
         while ((c = fgetc(fp)) != '\n' && c != EOF);
     }

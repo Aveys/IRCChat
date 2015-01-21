@@ -60,6 +60,7 @@ int main(int argc, char *argv[]) {
 
 void *thread_client(void *arguments){
     int alive = 1;
+    int n;
     fputs("Dans le thread\n",stdout);
     struct Args_Thread *args = arguments;
 
@@ -74,46 +75,45 @@ void *thread_client(void *arguments){
     strcpy(msg.salonCible,"NULL");
     sendto(sd,&msg,sizeof(Message),0, (struct sockaddr *)&moi.socket_addr, sizeof(moi.socket_addr));
     while(alive==1){
-        n = recvfrom(sd,&msg, sizeof(Message), 0, (struct sockaddr *) &client_addr, &addr_len);
+        n = recvfrom(sd,&msg, sizeof(Message), 0, (struct sockaddr *)&moi.socket_addr, sizeof(moi.socket_addr));
         if (n == -1)
             perror("recvfrom");
-        switch (msg.message) {
-            case Commande.SERVER:
-                printf("USER demande la connexion au serveur");
-                break;
-            case Commande.NICK:
-                printf("USER a changé de pseudonyme");
-                break;
-            case Commande.JOIN:
-                printf("USER a demande à rejoindre SALON");
-                break;
-            case Commande.PART:
-                printf("USER a quitté le SALON");
-                break;
-            case Commande.QUIT:
-                printf("USER s'est déconnecté");
-                break;
-            case Commande.LIST:
-                printf("USER a demandé la liste des salons ouvert");
-                //listSalon();
-                break;
-            case Commande.HELP:
-                printf("USER a demandé de l'aide");
-                break;
-            default:
-                printf("Commande non reconnue");
-                break;
+
+        if(strcmp(msg.message,"NICK")==0){
+
+        }
+        else if(strcmp(msg.message,"JOIN")==0){
+            fputs("USER a demande à rejoindre SALON",stdout);
+        }
+        else if (strcmp(msg.message,"PART")==0){
+            fputs("USER a quitté le SALON",stdout);
+        }
+        else if(strcmp(msg.message,"QUIT")==0){
+            fputs("USER s'est déconnecté",stdout);
+        }
+        else if(strcmp(msg.message,"LIST")==0){
+            fputs("USER a demandé la liste des salons ouvert",stdout);
+            //listSalon();
+        }
+        else if(strcmp(msg.message,"HELP")==0){
+            fputs("USER a demandé de l'aide",stdout);
+        }
+        else{
+            fputs("Commande non reconnue",stdout);
         }
     }
 }
 
 char* listSalon(){
+
 }
 
 char* listCommandes(){
     char* ret="Commande : \n - /SERVER <@IP>: Demander la connexion au serveur \n - /NICK <pseudonyme>: Changer de pseudonyme \n - /JOIN <Salon>: Rejoindre un serveur \n - /PART : Quitter le salon \n - /LIST : Lister les salons ouverts \n - /HELP : Afficher la liste des commandes possibles\n";
 }
+void envoyerMessageSalon(struct Salon salon, struct Message msg){
 
+}
 /*
 int startsWith(const char *pre, const char *str)
 {
