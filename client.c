@@ -8,11 +8,55 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 void clean(const char *buffer, FILE *fp);
 
-int sckt = -1, i;
+/**
+* @var socket client
+*/
+int sckt = -1;
+
+/**
+* Structure de gestion d'adresses cliente et serveur
+*/
 struct sockaddr_in client_addr, serv_addr;
+
+/**
+* Thread d'écoute serveur
+*/
+pthread_t ecoute;
+
+/**
+* Communications
+*/
+Communication * communications;
+
+void _log(char * message) {
+    printf("%s\n", message);
+}
+
+/**
+* Thread d'écoute serveur
+*/
+void * thread_process(void) {
+    char * buffer;
+    char target[3];
+    int n;
+
+    if ((n = read(sckt, buffer, MAX_MESSAGE)) > 0) {
+        printf("Server: %s\n", buffer);
+
+        strncpy(target, buffer, 3);
+
+        // Si c'est un message d'acquittement
+        if (strcmp(target, "ACK")) {
+
+        } else {
+
+        }
+    }
+}
 
 /**
 * Gère la connexion à un serveur de communication
@@ -37,11 +81,18 @@ int server(char * address, char * port) {
         return 1;
     }
 
-    serv_addr.sin_port = htons(port);
+    serv_addr.sin_port = htons(atoi(port));
+
+    if (connect(sckt, (struct sockaddr *) &serv_addr, sizeof serv_addr) == 1) {
+        perror("connect");
+        return 1;
+    }
+
+    pthread_create(&ecoute, NULL, thread_process, NULL);
 }
 
 /**
-*
+* Envoie une communication avec le serveur
 */
 int communicate(char * data) {
     if (sendto(sckt, data, strlen(data) + 1, 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
@@ -52,9 +103,7 @@ int communicate(char * data) {
     return 0;
 }
 
-int main(int argc, char *argv[]){
-    char command[MAX_MESSAGE];
-    char message[MAX_MESSAGE];
+int main(int argc, char *argv[]) {
     char * input;
     char * token;
     char * address;
@@ -84,7 +133,7 @@ int main(int argc, char *argv[]){
 
             }
         } else {
-            if (sckt && communicate(input)) {
+            if (sckt != -1 && communicate(input)) {
 
             }
         }
