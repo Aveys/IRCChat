@@ -25,8 +25,3 @@ typedef struct Communication {
     struct Communication * next;
 } Communication;
 
-typedef enum Commande Commande;
-enum Commande
-{
-    SERVER, NICK, JOIN, PART, QUIT, LIST, HELP
-};

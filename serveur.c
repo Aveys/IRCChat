@@ -102,7 +102,6 @@ void *thread_client(void *arguments){
             fputs("Commande non reconnue",stdout);
         }
     }
-    }
 }
 
 char* listSalon(){
@@ -111,7 +110,9 @@ char* listSalon(){
 char* listCommandes(){
     char* ret="Commande : \n - /SERVER <@IP>: Demander la connexion au serveur \n - /NICK <pseudonyme>: Changer de pseudonyme \n - /JOIN <Salon>: Rejoindre un serveur \n - /PART : Quitter le salon \n - /LIST : Lister les salons ouverts \n - /HELP : Afficher la liste des commandes possibles\n";
 }
+void envoyerMessageSalon(struct Salon salon, struct Message msg){
 
+}
 /*
 int startsWith(const char *pre, const char *str)
 {
