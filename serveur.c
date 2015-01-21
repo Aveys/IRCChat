@@ -19,10 +19,13 @@ int nbSalons=0;
 int sd;
 
 int main(int argc, char *argv[]) {
+    //INITIALISATION DES VARIABLES GLOBALES
     clients = malloc(sizeof(Client));
     salons = malloc(sizeof(Salon));
+
     pthread_t thread;
     int n;
+
     socklen_t addr_len;
     struct sockaddr_in client_addr, server_addr;
     struct Message msg;
@@ -35,6 +38,7 @@ int main(int argc, char *argv[]) {
         perror("socket creation");
         return 1;
     }
+
     // Bind it
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -45,15 +49,18 @@ int main(int argc, char *argv[]) {
     }
 
     for (; ;) {
+        // bloc de réception des clients
         printf("En attente d'une connection\n");
         addr_len = sizeof(client_addr);
         n = recvfrom(sd,&msg, sizeof(Message), 0, (struct sockaddr *) &client_addr, &addr_len);
         if (n == -1)
             perror("recvfrom");
-        printf("Structure reçu : %s, %s\n",msg.message,msg.salonCible);
-        if (strcmp(msg.message,"CONNECT")==0) {
-            printf("Connection d'un nouveau client : %s\n", inet_ntoa(client_addr.sin_addr));
-            args.addr=client_addr;
+
+        printf("Structure reçu : %s, %s\n",msg.message,msg.salonCible); //DEBUG
+
+        if (strcmp(msg.message,"CONNECT")==0){// Vérification que le message commence par CONNECT
+            printf("Connection d'un nouveau client : %s\n", inet_ntoa(client_addr.sin_addr)); //DEBUG
+            args.addr=client_addr; //ajout du nouveau client à un structure argument pour la creation du thread)
             if(pthread_create(&thread, NULL, thread_client, (void *)&args) != 0){
                 perror("Impossible de creer le thread");
             }
@@ -76,8 +83,8 @@ void *thread_client(void *arguments){
 
 
     struct Message msg;
-    msg.message=strdup("ACK_CONNECTED");
-    msg.salonCible=strdup("");
+    strcpy(msg.message,"ACK_CONNECTED");
+    strcpy(msg.salonCible,"");
 
     socklen_t addr_len;
     struct sockaddr_in client_addr;
