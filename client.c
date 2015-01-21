@@ -38,7 +38,6 @@ pthread_mutex_t communication_mutex;
 /**
 * Communications
 */
-int shmid;
 Communication * communications;
 
 void _log(char * message) {
@@ -53,8 +52,6 @@ void * thread_communicate(void * var) {
     char buffer[255];
     char target[3];
 
-    pthread_mutex_lock(&communication_mutex);
-
     if (send(sckt, data, strlen(data) + 1, 0)) {
         perror("sendto");
         return NULL;
@@ -64,11 +61,9 @@ void * thread_communicate(void * var) {
         strncpy(target, buffer, 3);
 
         if (strcmp("ACK", buffer) == 0) {
-            pthread_exit(NULL);
+            return NULL;
         }
     }
-
-    pthread_mutex_unlock(&communication_mutex);
 
     return NULL;
 }
