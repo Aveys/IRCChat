@@ -69,7 +69,10 @@ void _log(char * message, ...) {
 * Envoie une communication avec le serveur avec un thread non bloquant
 */
 void * thread_communicate(void * var) {
-    Response * response;
+    Response * response = &(Response) {
+        .code = 0
+    };
+
     struct Message message;
     fd_set rfds;
     struct timeval tv;
@@ -90,6 +93,7 @@ void * thread_communicate(void * var) {
         return NULL;
     }
 
+    // Timeout de 5 secondes pour la réception d'un ACK
     response->code = select(sckt + 1, &rfds, NULL, NULL, &tv);
 
     if (response->code == -1) {
