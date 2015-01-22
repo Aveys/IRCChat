@@ -1,4 +1,4 @@
-/**
+./**
 *
 * @author Vincent Valot, Mohammed Zizah
 * @brief Implémentation d'un client pour un chat entre plusieurs autres clients
@@ -15,7 +15,6 @@
 #include <pthread.h>
 #include <stdarg.h>
 #include <regex.h>
-#include <Foundation/Foundation.h>
 
 #include "protocole.h"
 #include "client.h"
@@ -146,7 +145,7 @@ int main(int argc, char *argv[]) {
                             _log("# Connexion au serveur %s port %s échouée\n", address, port);
                         }
                     } else {
-                        _log("# Utilisation de SERVER: /SERVER ip port\n");
+                        _log("# Utilisation de SERVER: /SERVER ip port [pseudonyme]\n");
                     }
                 } else if (command && sckt != -1) {
                     communicate(command, input);
@@ -163,7 +162,6 @@ int main(int argc, char *argv[]) {
     } while (strcmp(command, "EXIT") != 0);
 
     _log("# Fermeture de l'application\n");
-    pthread_exit(NULL);
 
     return 0;
 }
@@ -181,14 +179,18 @@ void _log(const char *message, ...) {
 }
 
 void _debug(const char *message, ...) {
+    time_t current;
+    struct tm date;
+    char format[128];
+
     if (debug == 1) {
-        time_t current;
-        struct tm date;
 
         time(&current);
         date = *localtime(&current);
 
-        printf("#DEBUG: %s\n", message);
+        strftime(format, 128, "%Y-%m-%d %H:%M", &date);
+
+        printf("DEBUG\t%s\t%s\n", format, message);
     }
 }
 
@@ -203,6 +205,7 @@ void *thread_send(void *var) {
     _processing->code = -1;
 
     strcpy(_processing->request.message, (char *) var);
+    strcpy(_processing->request.salonCible, _salon);
 
     if (sendto(sckt, &_processing->request, sizeof(_processing->request) + 1, 0, (struct sockaddr *) &serv_addr, addr_len) == -1) {
         perror("sendto()");
@@ -222,18 +225,20 @@ void *thread_send(void *var) {
 void *thread_listen(void *var) {
     Communication * communication = malloc(sizeof(Communication));
     char target[3];
+    char * command;
+    int isAliveAck;
 
     while (sckt != -1) {
         _debug("thread_listen -> Waiting...");
         if (recvfrom(sckt, &communication->response, sizeof(communication->response), 0, (struct sockaddr *) &serv_addr, &addr_len) > 0) {
             _debug("thread_listen -> Received");
 
-            char * command = getPartOfCommand(communication->response.message, 1);
+            isAliveAck = strcmp("ACK_ALIVE", communication->response.message);
 
             strncpy(target, communication->response.message, 3);
 
             if (_processing) {
-                if (strcmp("ACK", target) == 0) {
+                if (strcmp("ACK", target) == 0 && isAliveAck != 0) {
                     _processing->code = 1;
                     pthread_mutex_unlock(&_processing_mutex);
                 } else if (strcmp("ERR", target) == 0) {
@@ -243,8 +248,11 @@ void *thread_listen(void *var) {
                     // Si on a pas reçu d'ACK mais que la requête est toujours en attente, on débloque
                     pthread_mutex_unlock(&_processing_mutex);
                 }
-            } else {
+            } else if (isAliveAck != 0) {
+                command = getPartOfCommand(communication->response.message, 1);
                 call_function(command, communication);
+
+                free(command);
             }
         }
     }
@@ -272,9 +280,8 @@ int communicate(const char * command, char * message) {
     pthread_attr_destroy(&send_pthread_attr);
 
     // On bloque ici en attente d'avoir l'ACK, si on ne reçois pas
-    _log("#DEBUG: Locked %s", message);
+    _debug("communicate -> Waiting for response");
     pthread_mutex_lock(&_processing_mutex);
-    _debug("Unlocked");
 
     // Test de la valeur de retour
     if (_processing->code) {
