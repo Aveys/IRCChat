@@ -313,3 +313,4 @@ int startsWith(const char *pre, const char *str)
             lenstr = strlen(str);
     return lenstr < lenpre ? 0 : strncmp(pre, str, lenpre) == 0;
 }
+//TEST
