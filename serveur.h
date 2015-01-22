@@ -1,8 +1,9 @@
-struct Message listeSalon();
-struct Message listeCommandes();
+void listeSalon(struct Message *msg);
+void listeCommandes(struct Message *msg);
 struct Message erreurCommande();
 struct Message joindreSalon(char* nomSalon, struct Client *c);
-struct Message quitterSalon(char* nomSalon,struct Client c);
+void quitterSalon(struct sockaddr_in adresse,char *salonCible);
+void quitterServeur(struct sockaddr_in adresse);
 int findClient(struct sockaddr_in adresse);
 int findSalon(char *nomSalon);
 void envoyerMessageClient(struct sockaddr_in,struct Message msg);

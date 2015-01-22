@@ -1,3 +1,4 @@
+
 #include "protocole.h"
 #include "serveur.h"
 
@@ -8,7 +9,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <pthread.h>
 
 #define PORT_SERVEUR 1500
 
@@ -52,8 +52,8 @@ int main(int argc, char *argv[]) {
     char *ancienPseudo;
     int indice ;
     int indiceClient;
-    char* nomSalon;
-    char *message;
+    char *nomSalon="";
+    char *message="";
     printf("------ Lancement du serveur ------\n");
     for (; ;) {
         // bloc de réception des clients
@@ -148,29 +148,29 @@ int main(int argc, char *argv[]) {
 
         }
         else if (startsWith( "PART",msg.message) == 1) {
-
-            fputs("USER a quitté le SALON", stdout);
+            quitterSalon(client_addr,msg.salonCible);
         }
         else if (startsWith("QUIT",msg.message) == 1) {
-            //VERIFIER PRESENCE DANS SALON -> SUPPRIMER DES SALONS
-
-            //supprimerClient(); SUPPRIMER DU SERVEUR
+            quitterServeur(client_addr);
         }
-        else if (startsWith("LIST",msg.message) == 1) {
-            fputs("USER a demandé la liste des salons ouvert", stdout);
-            msg = listeSalon();
+        else if (startsWith("LIST",msg.message) == 1) {//TODO : debug
+            getDateTime(time_serveur);
+            printf("%s --------- L'utilisateur %s a demandé la liste des salons ouvert ---------", time_serveur,inet_ntoa(client_addr.sin_addr));
+            listeSalon(&msg);
             envoyerMessageClient(client_addr, msg);
         }
         else if (startsWith("HELP",msg.message) == 1) {
-            fputs("USER a demandé de l'aide", stdout);
-            msg = listeSalon();
+            getDateTime(time_serveur);
+            printf("%s-------- L'utilisateur %s à demandé la chaine de caractére d'aide -----------",time_serveur, inet_ntoa(client_addr.sin_addr));
+            listeCommandes(&msg);
             envoyerMessageClient(client_addr, msg);
         }
         else if (startsWith("ALIVE",msg.message) == 1) {
-            printf("%s------- L'utilisateur %s:%s a signalé qu'il était vivant ---------",time_serveur,clients[indiceClient].pseudo,inet_ntoa(client_addr.sin_addr));
+            printf("%s------- L'utilisateur %s:%s a signalé qu'il était vivant mais je sais pas encore le gerer :( ---------",time_serveur,clients[indiceClient].pseudo,inet_ntoa(client_addr.sin_addr));
         }
         else {
-            fputs("Commande non reconnue", stdout);
+            getDateTime(time_serveur);
+            printf("%s!!!!!!!! Reception d'une commande inconnue : %s !!!!!!!!!!!",time_serveur,msg.message);
             msg = erreurCommande();
             envoyerMessageClient(client_addr, msg);
         }
@@ -207,23 +207,20 @@ struct Client getCurrentClient(struct sockaddr_in adresse){
     return clients[indice];
 }
 
-struct Message listeSalon(){
-    struct Message ret;
-    strcpy(ret.salonCible,"");
-    strcpy(ret.message,"ACK_LIST");
+void listeSalon(struct Message *message){
+
+    strcpy(message->salonCible,"");
+    strcpy(message->message,"ACK_LIST");
     for(int i=0;i<nbSalons;i++){
         if(i!=0)
-            strcat(ret.message,", ");
-        strcat(ret.message,salons[nbSalons].name);
+            strcat(message->message,", ");
+        strcat(message->message,salons[nbSalons].name);
     }
-    return ret;
 }
 
-struct Message listeCommandes(){
-    struct Message ret;
-    strcpy(ret.message,"ACK_HELP /SERVER <@IP>: Demander la connexion au serveur \n - /NICK <pseudonyme>: Changer de pseudonyme \n - /JOIN <Salon>: Rejoindre un serveur \n - /PART : Quitter le salon \n - /LIST : Lister les salons ouverts \n - /HELP : Afficher la liste des commandes possibles\n");
-    strcpy(ret.salonCible,"");
-    return ret;
+void listeCommandes(struct Message *msg){
+    strcpy(msg->message,"ACK_HELP /SERVER <@IP>: Demander la connexion au serveur \n - /NICK <pseudonyme>: Changer de pseudonyme \n - /JOIN <Salon>: Rejoindre un serveur \n - /PART : Quitter le salon \n - /LIST : Lister les salons ouverts \n - /HELP : Afficher la liste des commandes possibles\n");
+    strcpy(msg->salonCible,"");
 }
 
 struct Message erreurCommande(){
@@ -255,20 +252,16 @@ struct Message joindreSalon(char* nomSalon, struct Client *c){
         nbSalons++;
 
     }
-
-    //Ajout du client au salon
-    salons[existe].clients[salons[existe].nbClient]=*c;
-    salons[existe].nbClient++;
-
     s=salons[existe];
     //Informer autres clients
     struct Message ret;
     strcpy(ret.salonCible,s.name);
     strcpy(ret.message,"CHANJOINED ");
     strcat(ret.message,c->pseudo);
-
     envoyerMessageSalon(s, ret); // Envoi du message à tous les clients du salon
-
+    //Ajout du client au salon
+    salons[existe].clients[salons[existe].nbClient]=*c;
+    salons[existe].nbClient++;
     strcpy(ret.message,"ACK_JOIN"); // Message de retour client
     strcpy(ret.salonCible,"NULL");
     return ret;
@@ -314,7 +307,8 @@ void printClients(){
 
     }
     printf("\n");
-}void printSalon(){
+}
+void printSalon(){
     for (int i = 0; i < nbSalons; ++i) {
         Salon s = salons[i];
         printf("Salon{%s %i}\t",s.name,s.nbClient);
@@ -344,4 +338,54 @@ void getDateTime(char *t){
     time( &rawtime );
     info = localtime( &rawtime );
     strftime(t,80,"%d/%m/%Y - %H:%M:%S : ", info);
+}
+
+void quitterSalon(struct sockaddr_in adresse,char *salonCible) {
+    int indice = findSalon(salonCible); //recupération de l'indice salon
+    int indiceClient= findClient(adresse); // récupération de l'indice client
+
+
+    if (indice != -1){
+        char *reponse="";
+        sprintf(reponse,"CHANLEAVED %s",clients[indiceClient].pseudo);
+        struct Message message;
+        strcpy(message.salonCible,salonCible);
+        strcpy(message.message,reponse);
+        envoyerMessageSalon(salons[indice], message);
+        getDateTime(time_serveur);
+
+        printf("%s-------- suppression de l'utilisateur %s du salon %s ----------",time_serveur,clients[indice].pseudo,salonCible);
+        int indiceSalon=trouverClientDansSalon(salons[indice],adresse);
+        decalageClientDansSalon(salons[indice], indiceSalon);
+        salons[indice].nbClient--;
+
+        if(salons[indice].nbClient == 0){
+            getDateTime(time_serveur);
+            printf("%s-------- Salon vide: supression du salon %s ----------",time_serveur,salonCible);
+            decalageSalon(indice);
+            nbSalons--;
+        }
+    }
+    else{
+        getDateTime(time_serveur);
+        printf("%s-------- l'utilisateur %s est introuvable sur le salon %s ----------",time_serveur,clients[indice].pseudo,salonCible);
+    }
+}
+
+void quitterServeur(struct sockaddr_in adresse) {
+    for (int i = 0; i < nbSalons; ++i) {
+        quitterSalon(adresse, salons[i].name);
+    }
+    int indiceClient = findClient(adresse);
+    if (indiceClient!=-1){
+        getDateTime(time_serveur);
+        printf("%s-------- Suppression de l'utilisateur %s du serveur ----------",time_serveur,clients[indiceClient].pseudo);
+        decalageClient(indiceClient);
+        nbClients--;
+    }
+    else{
+        getDateTime(time_serveur);
+        printf("%s-------- l'utilisateur %s est introuvable sur le serveur ----------",time_serveur, inet_ntoa(adresse.sin_addr));
+    }
+
 }
