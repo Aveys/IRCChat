@@ -69,6 +69,12 @@ char *_nickname = "Anonymous";
 char *_salon;
 
 /**
+* Salons courants du client
+*/
+char * _salons[10];
+int nbSalons = 0;
+
+/**
 * Communication en envoi
 */
 Communication *_processing;
@@ -145,7 +151,7 @@ int main(int argc, char *argv[]) {
                             _log("# Connexion au serveur %s port %s échouée\n", address, port);
                         }
                     } else {
-                        _log("# Utilisation de SERVER: /SERVER ip port\n");
+                        _log("# Utilisation de SERVER: /SERVER ip port [pseudonyme]\n");
                     }
                 } else if (command && sckt != -1) {
                     communicate(command, input);
@@ -162,7 +168,6 @@ int main(int argc, char *argv[]) {
     } while (strcmp(command, "EXIT") != 0);
 
     _log("# Fermeture de l'application\n");
-    pthread_exit(NULL);
 
     return 0;
 }
@@ -180,14 +185,18 @@ void _log(const char *message, ...) {
 }
 
 void _debug(const char *message, ...) {
+    time_t current;
+    struct tm date;
+    char format[128];
+
     if (debug == 1) {
-        time_t current;
-        struct tm date;
 
         time(&current);
         date = *localtime(&current);
 
-        printf("#DEBUG: %s\n", message);
+        strftime(format, 128, "%Y-%m-%d %H:%M", &date);
+
+        printf("DEBUG\t%s\t%s\n", format, message);
     }
 }
 
@@ -202,6 +211,9 @@ void *thread_send(void *var) {
     _processing->code = -1;
 
     strcpy(_processing->request.message, (char *) var);
+    if (_salon) {
+        strcpy(_processing->request.salonCible, _salon);
+    }
 
     if (sendto(sckt, &_processing->request, sizeof(_processing->request) + 1, 0, (struct sockaddr *) &serv_addr, addr_len) == -1) {
         perror("sendto()");
@@ -213,6 +225,16 @@ void *thread_send(void *var) {
 }
 
 /**
+* Teste le temps depuis l'émission de la requête procession, le cas échéant débloque le mutex de requete
+*/
+void testProcessingRequestTime() {
+    if ((time(NULL) - _processing->requested) > 5) {
+        // Si on a pas reçu d'ACK mais que la requête est toujours en attente, on débloque
+        pthread_mutex_unlock(&_processing_mutex);
+    }
+}
+
+/**
 * Envoie une communication avec le serveur avec un thread non bloquant
 *
 * @var var La chaine de caractère à envoyer
@@ -221,29 +243,34 @@ void *thread_send(void *var) {
 void *thread_listen(void *var) {
     Communication * communication = malloc(sizeof(Communication));
     char target[3];
+    char * command;
 
     while (sckt != -1) {
         _debug("thread_listen -> Waiting...");
         if (recvfrom(sckt, &communication->response, sizeof(communication->response), 0, (struct sockaddr *) &serv_addr, &addr_len) > 0) {
             _debug("thread_listen -> Received");
 
-            char * command = getPartOfCommand(communication->response.message, 1);
-
             strncpy(target, communication->response.message, 3);
 
-            if (_processing) {
+            if (strcmp("ERR_CMDUNKNOWN", communication->response.message) == 0) {
+                _log("# La commande n'est pas reconnue par le serveur\n");
+            } else if (strcmp("ACK_ALIVE", communication->response.message) == 0) {
+                testProcessingRequestTime();
+            } else if (_processing) {
                 if (strcmp("ACK", target) == 0) {
                     _processing->code = 1;
                     pthread_mutex_unlock(&_processing_mutex);
                 } else if (strcmp("ERR", target) == 0) {
                     _processing->code = 2;
                     pthread_mutex_unlock(&_processing_mutex);
-                } else if ((time(NULL) - _processing->requested) > 5) {
-                    // Si on a pas reçu d'ACK mais que la requête est toujours en attente, on débloque
-                    pthread_mutex_unlock(&_processing_mutex);
+                } else {
+                    testProcessingRequestTime();
                 }
             } else {
+                command = getPartOfCommand(communication->response.message, 1);
                 call_function(command, communication);
+
+                free(command);
             }
         }
     }
@@ -271,9 +298,8 @@ int communicate(const char * command, char * message) {
     pthread_attr_destroy(&send_pthread_attr);
 
     // On bloque ici en attente d'avoir l'ACK, si on ne reçois pas
-    _debug("Locked");
+    _debug("communicate -> Waiting for response");
     pthread_mutex_lock(&_processing_mutex);
-    _debug("Unlocked");
 
     // Test de la valeur de retour
     if (_processing->code) {
@@ -310,7 +336,7 @@ void *thread_alive(void *var) {
             perror("sendto()");
         }
 
-        sleep(TIMEOUT);
+        sleep(10);
     }
 
     return NULL;
@@ -323,8 +349,6 @@ void *thread_alive(void *var) {
 * @var port     Port du serveur
 */
 int server(const char *address, const char *port) {
-    char *message = "CONNECT";
-
     if ((sckt = socket(PF_INET, SOCK_DGRAM, 0)) == -1) {
         return 1;
     }
@@ -350,10 +374,11 @@ int server(const char *address, const char *port) {
 * Handler d'un envoi de message Join
 */
 void _joinHandler(const Communication *communication) {
-    char * tmp = getPartOfCommand(&communication->request.message[0], 2);
+    char * tmp = getPartOfCommand(communication->request.message, 2);
 
     if (strlen(tmp) > 0) {
         _salon = strdup(tmp);
+        addSalon(_salon);
         free(tmp);
         _log("# Vous avez bien rejoint le salon <%s>\n", _salon);
     } else {
@@ -363,6 +388,9 @@ void _joinHandler(const Communication *communication) {
 
 void _partHandler(const Communication *communication) {
     if (strcmp("ACK_PART", communication->response.message)) {
+        char * salon = getPartOfCommand(communication->request.message, 2);
+        removeSalon(salon);
+
         _log("# Vous avez bien quitté le salon\n");
     } else if (strcmp("ERR_NOCHANNELJOINED", communication->response.message)) {
         _log("# Vous avez demandé à quitter un salon que vous n'aviez pas rejoint\n");
@@ -389,6 +417,9 @@ void _quitHandler(const Communication *communication) {
 }
 
 void _listHandler(const Communication *communication) {
+    char * salons = getPartOfCommand(communication->request.message, 2);
+
+    _log("Les salons disponibles sont: %s", salons);
 }
 
 void _nickHandler(const Communication *communication) {
@@ -407,7 +438,9 @@ void _nickHandler(const Communication *communication) {
 void _messageHandler(const Communication *communication) {
     _debug("MESSAGE");
 
-    _log("<%s> %s\n", _nickname, communication->response.message);
+    char * message = getPartOfCommand(communication->request.message, 2);
+
+    _log("<%s> %s\n", _nickname, message);
 }
 
 void _helpHandler(const Communication *response) {
@@ -495,7 +528,7 @@ char *getPartOfCommand(const char *command, int part) {
 
             value = malloc(sizeof(char) * (size + 1));
 
-            if (value) {
+            if (value && size > 0) {
                 strncpy(value, &command[start], size);
                 value[size] = '\0';
             }
@@ -507,6 +540,28 @@ char *getPartOfCommand(const char *command, int part) {
     }
 
     return value;
+}
+
+void removeSalon(char * salon) {
+    int i, index = -1;
+
+    for (i = 0; i < nbSalons; i++) {
+        if (strcmp(_salons[i], salon) != 0) {
+            index = i;
+            break;
+        }
+    }
+
+    for(i = index; i < nbSalons; i++) {
+        _salons[i] = _salons[i+1];
+    }
+}
+
+void addSalon(char * salon) {
+    if (nbSalons < 10) {
+        strcpy(_salons[nbSalons], salon);
+        nbSalons++;
+    }
 }
 
 /**
