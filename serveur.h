@@ -1,19 +1,35 @@
-void listeSalon(struct Message *msg);
-void listeCommandes(struct Message *msg);
+void listeSalon(struct Message *);
+
+void listeCommandes(struct Message *);
+
 struct Message erreurCommande();
-struct Message joindreSalon(char* nomSalon, struct Client *c);
-void quitterSalon(struct sockaddr_in adresse,char *salonCible);
-void quitterServeur(struct sockaddr_in adresse);
-int findClient(struct sockaddr_in adresse);
-int findSalon(char *nomSalon);
-void envoyerMessageClient(struct sockaddr_in,struct Message msg);
-void envoyerMessageSalon(struct Salon salon, struct Message msg);
-int startsWith(const char *pre, const char *str);
-int trouverClientDansSalon(struct Salon s,struct sockaddr_in adresse);
-struct Client getCurrentClient(struct sockaddr_in adresse);
+
+struct Message joindreSalon(char * , struct Client *);
+
+void quitterSalon(struct sockaddr_in ,char *);
+
+void quitterServeur(struct sockaddr_in );
+
+int findClient(struct sockaddr_in);
+
+int findSalon(char *);
+
+void envoyerMessageClient(struct sockaddr_in, struct Message );
+
+void envoyerMessageSalon(struct Salon , struct Message );
+
+int startsWith(const char *, const char *);
+
+int trouverClientDansSalon(struct Salon ,struct sockaddr_in );
+
 void printClients();
+
 void printSalons();
-void decalageClient(int pos);
-void decalageSalon(int pos);
-void decalageClientDansSalon(Salon s, int pos);
-void getDateTime(char *t);
+
+void decalageClient(int );
+
+void decalageSalon(int );
+
+void decalageClientDansSalon(Salon , int );
+
+void getDateTime(char *);
