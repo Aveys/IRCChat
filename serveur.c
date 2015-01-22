@@ -59,11 +59,11 @@ int main(int argc, char *argv[]) {
 
         printf("Structure reçu : %s, %s\n",msg.message,msg.salonCible); //DEBUG
 
-        if (strcmp(msg.message,"CONNECT")==0){// Vérification que le message commence par CONNECT
+        if (startsWith("CONNECT",msg.message) == 1){// Vérification que le message commence par CONNECT
 
             printf("Demande de connection d'un nouveau client : %s\n", inet_ntoa(client_addr.sin_addr)); //DEBUG
-            Client recherche = findClient(client_addr);
-            if(strcmp(recherche.pseudo,"introuvable")==0){
+            int indice = findClient(client_addr);
+            if(indice==-1){
                 printf("Ajout du client\n");
                 strcpy(tmp.pseudo,"ANONYME");
                 tmp.socket_addr=client_addr;
@@ -72,15 +72,31 @@ int main(int argc, char *argv[]) {
                 // creation de la structure de réponse à la connection
                 strcpy(msg.message,"ACK_CONNECTED");
                 strcpy(msg.salonCible,"");
-                sendto(sd,&msg, sizeof(Message),0,(struct sockaddr *) &client_addr,addr_len);
+                envoyerMessageClient(tmp, msg);
             }
             else{
+                strcpy(tmp.pseudo,"ANONYME");
+                tmp.socket_addr=client_addr;
                 strcpy(msg.message,"ERR_IPALREADYUSED");
                 strcpy(msg.salonCible,"");
-                sendto(sd,&msg, sizeof(Message),0,(struct sockaddr *) &client_addr,addr_len);
+                envoyerMessageClient(tmp, msg);
             }
         }
-        else if (strcmp(msg.message, "NICK") == 0) {
+        else if (startsWith("NICK",msg.message) == 1) {
+            int indice = findClient(client_addr);
+            int indiceSalon=-1;
+            char *nickname;
+            strcpy(nickname,msg.message);
+            nickname+=5;
+            printf("Changement de pseudonyme de %s en %s",clients[indice].pseudo,nickname);
+            for (int i = 0; i < nbSalons; ++i) {
+                if( (indiceSalon = trouverClientDansSalon(salons[i], client_addr))!= -1){
+
+                }
+            }
+
+    int estVivant = 1;
+    int n;
 
         }
         else if (strcmp(msg.message, "JOIN") == 0) {
@@ -105,26 +121,71 @@ int main(int argc, char *argv[]) {
             //envoyerMessageClient(moi, msg);
         }
         else {
-            fputs("Commande non reconnue", stdout);
-            msg = erreurCommande();
-            //envoyerMessageClient(moi, msg);
+            if (strcmp(msg.message, "NICK") == 0) {
+
+            }
+            else if (strcmp(msg.message, "MESSAGE") == 0) {
+
+            }
+            else if (strcmp(msg.message, "JOIN") == 0) {
+                fputs("USER a demande à rejoindre SALON", stdout);
+                char* nomSalon;
+                char tab[2][MAX_NAME]; // [][]
+                tab = strtok(msg," "); // [JOIN][NomSalon]
+                nomSalon= tab[1];  // On récupere le nom du salon
+                msg = joindreSalon(nomSalon, moi);
+                envoyerMessageClient(moi, msg);
+            }
+            else if (strcmp(msg.message, "PART") == 0) {
+                msg = quitterSalon();
+                fputs("USER a quitté le SALON", stdout);
+            }
+            else if (strcmp(msg.message, "QUIT") == 0) {
+                fputs("USER s'est déconnecté", stdout);
+            }
+            else if (strcmp(msg.message, "LIST") == 0) {
+                fputs("USER a demandé la liste des salons ouvert", stdout);
+                msg = listeSalon();
+                envoyerMessageClient(moi, msg);
+            }
+            else if (strcmp(msg.message, "HELP") == 0) {
+                fputs("USER a demandé de l'aide", stdout);
+                msg = listeSalon();
+                envoyerMessageClient(moi, msg);
+            }
+            else {
+                fputs("Commande non reconnue", stdout);
+                msg = erreurCommande();
+                envoyerMessageClient(moi, msg);
+            }
         }
     }
 }
-
-struct Client findClient(struct sockaddr_in adresse){
+//renvoi l'indice du client dans le tableau
+int findClient(struct sockaddr_in adresse){
     struct sockaddr_in c;
     for (int i = 0; i < nbClients; i++) {
-        c=clients[nbClients].socket_addr;
+        c=clients[i].socket_addr;
         if(strcmp(inet_ntoa(adresse.sin_addr),inet_ntoa(c.sin_addr))==0){
             printf("Client trouvé\n");
-            return clients[nbClients];
+            return i;
         }
     }
     printf("Utilisateur %s introuvable\n",inet_ntoa(adresse.sin_addr));
-    struct Client tmp;
-    strcpy(tmp.pseudo,"introuvable");
-    return tmp;
+    return -1;
+}
+//renvoi l'indice du client dans le salon
+int trouverClientDansSalon(struct Salon s,struct sockaddr_in adresse){
+    struct sockaddr_in c;
+    for (int i = 0; i < s.nbClient; i++) {
+        c=s.clients[i].socket_addr;
+        if(strcmp(inet_ntoa(adresse.sin_addr),inet_ntoa(c.sin_addr))==0){
+            printf("Client trouvé dans le salon %s\n",s.name);
+            return i;
+        }
+    }
+    printf("Utilisateur %s introuvable dans le salon %s\n",inet_ntoa(adresse.sin_addr),s.name);
+    return -1;
 }
 struct Message listeSalon(){
     struct Message ret;
@@ -151,6 +212,70 @@ struct Message erreurCommande(){
     return ret;
 }
 
+
+struct Message quitterSalon(char* nomSalon,Client c){
+//SI un seul client dans le salon, on supprime le salon
+    int existe=0;
+    Salon s;
+    for(i=0;i<nbSalons;i++){
+        if(nomSalon=salons->name){
+            existe=1;
+            break;
+        }
+    }
+    if(existe){
+        s=salons[i];
+    }
+    if(s.nbClient<=1){
+        //SUPPRIMER SALON
+    }else{
+    //Suppression de l'utilisateur dans la liste de client du salon
+    }
+
+//Suppression du client de la liste client associé au salon
+
+}
+
+
+struct Message joindreSalon(char* nomSalon,Client c){
+    //Vérifier si le salon existe
+    int existe=0;
+    Salon s;
+    for(i=0;i<nbSalons;i++){
+        if(nomSalon=salons->name){
+            existe=1;
+            break;
+        }
+     }
+    //SI n'existe pas ALORS création du salon
+    if(!existe){
+        s.name=nomSalon;
+        s.clients="NOM CLIENT";
+        realloc_s(&salons, sizeof(salons)*(sizeof(s)+1));
+        nbSalons++;
+        salons[nbSalons]=s;
+    }else{
+        //Affectation du salon trouvé à la structure salon
+        s=salons[i];
+    }
+    //Ajout du client au salon
+    realloc_s(&s->clients, sizeof(s->clients)*(sizeof(c)+1));
+    s->nbClients++;
+    s->clients[nbClients]=c;
+
+    //Informer autres clients
+    struct Message ret;
+    strcpy(ret.salonCible,"");
+    strcpy(ret.message,"MESSAGE ");
+    srtcat(ret.message,c.pseudo);
+    srtcat(ret.message," s'est connecté"); // MESSAGE NomClient s'est connecté
+    envoyerMessageSalon(s, ret); // Envoi du message à tous les clients du salon
+
+    strcpy(ret.message,"ACK_JOIN"); // Message de retour client
+    strcpy(ret.salonCible,"NULL");
+    return ret;
+}
+
 void envoyerMessageClient(struct Client client,struct Message msg){
     sendto(sd,&msg,sizeof(Message),0, (struct sockaddr *)&client.socket_addr, sizeof(client.socket_addr));
 }
@@ -162,7 +287,16 @@ void envoyerMessageSalon(struct Salon salon, struct Message msg){
         envoyerMessageClient(c,msg);
     }
 }
-
+int VerifierUtilisationPseudonyme(char pseudonyme[]){
+    int ret=0;
+    struct Client tmp;
+    for (int i = 0; i < nbClients; ++i) {
+        tmp = clients[i];
+        if(strcmp(pseudonyme,tmp.pseudo)==0)
+            ret=1;
+    }
+    return ret;
+}
 void* realloc_s (void **ptr, size_t taille){
     void *ptr_realloc = realloc(*ptr, taille);
 
@@ -172,10 +306,11 @@ void* realloc_s (void **ptr, size_t taille){
 
     return ptr_realloc;
 }
-/*
+
 int startsWith(const char *pre, const char *str)
 {
     size_t lenpre = strlen(pre),
             lenstr = strlen(str);
     return lenstr < lenpre ? 0 : strncmp(pre, str, lenpre) == 0;
-}*/
+}
+//TEST
