@@ -89,29 +89,29 @@ int main(int argc, char *argv[]) {
             char *ancienPseudo;
 
             printClients(); //DEBUG : affiche liste des clients
+            printf("%s\n",clients[indice].pseudo);
             strcpy(ancienPseudo,clients[indice].pseudo);
-
             printf("Ancien pseudo : %s\n",ancienPseudo);//SEGMENTFAULT
             strcpy(nickname,msg.message);
             nickname+=5;
-            printf("Changement de pseudonyme de %s en %s",clients[indice].pseudo,nickname);
+            printf("Changement de pseudonyme de %s en %s\n",clients[indice].pseudo,nickname);
             strcpy(clients[indice].pseudo,nickname);// on modifie le client dans la structure client
             for (int i = 0; i < nbSalons; ++i) {
                 if( (indiceSalon = trouverClientDansSalon(salons[i], client_addr))!= -1){
+                    printf("Utilisateur trouvé dans le salon %s\n",salons[indiceSalon].name);
                     strcpy(salons[i].clients[indiceSalon].pseudo,nickname);// on modifie le nickname dans la structure du salon
                     sprintf(messageRetour,"NICKMODIFIED %s %s",ancienPseudo,nickname);
-                    printf("Envoi de la trame : %s",messageRetour);
+                    printf("Envoi de la trame : %s\n",messageRetour);
                     strcpy(msg.message,messageRetour);
                     strcpy(msg.salonCible,salons[i].name);
                     envoyerMessageSalon(salons[i],msg);
-                    strcpy(msg.message,"ACK_NICKMODIFIED");//envoi de la notification de succes au client
-                    strcpy(msg.salonCible,"");
-                    envoyerMessageClient(tmp.socket_addr, msg);
-
                 }
+
             }
-
-
+            printf("Envoi de la trame d'ACK_NICKMODIFIED");
+            strcpy(msg.message,"ACK_NICKMODIFIED");//envoi de la notification de succes au client
+            strcpy(msg.salonCible,"");
+            envoyerMessageClient(client_addr, msg);
         }
         else if (startsWith("JOIN",msg.message) == 1) {
             fputs("USER a demande à rejoindre SALON", stdout);
