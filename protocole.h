@@ -1,5 +1,7 @@
 #define MAX_NAME 20
 #define MAX_MESSAGE 250
+#define MAX_SALONS 10
+#define MAX_CLIENTS 20
 
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -13,7 +15,7 @@ typedef struct Client {
 
 typedef struct Salon {
     char name[MAX_NAME];
-    Client * clients;
+    Client clients[MAX_CLIENTS];
     int nbClient;
 } Salon;
 
