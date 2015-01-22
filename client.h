@@ -1,5 +1,3 @@
-
-
 #define TIMEOUT 10
 
 /**
@@ -7,6 +5,7 @@
 */
 typedef struct Communication {
     int code;
+    time_t requested;
     struct Message response;
     struct Message request;
 } Communication;
@@ -23,9 +22,11 @@ void prepend(char *, const char *);
 
 int communicate(const char *, char *);
 
-void * thread_communicate(void *);
+void * thread_send(void *);
 
 void * thread_alive(void *);
+
+void *thread_listen(void *);
 
 void _log(const char *, ...);
 
@@ -41,6 +42,4 @@ void prepend(char *, const char *);
 
 int call_function(const char *, Communication *);
 
-void addSalon(char *);
-
-void removeSalon(char *);
+void sigint(int signal);
