@@ -25,9 +25,3 @@ struct Message {
     time_t t;
 } Message;
 
-typedef struct Communication {
-    char message[MAX_MESSAGE];
-    int acquitted;
-    struct Communication * suivant;
-} Communication;
-
