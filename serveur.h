@@ -12,3 +12,6 @@ int trouverClientDansSalon(struct Salon s,struct sockaddr_in adresse);
 struct Client getCurrentClient(struct sockaddr_in adresse);
 void printClients();
 void printSalons();
+void decalageClient(int pos);
+void decalageSalon(int pos);
+void decalageClientDansSalon(Salon s, int pos);
