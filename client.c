@@ -55,7 +55,7 @@ char *nickname = "Anonymous";
 /**
 * Salon courant du client
 */
-char ** salon;
+char * salon;
 
 void sigint(int signal) {
     _log("\n# Fermeture de l'application... Veuillez patienter...\n");
@@ -308,6 +308,8 @@ void _joinHandler(const Communication *communication) {
     char * tmp = getPartOfCommand(&communication->request.message[0], 2);
 
     if (strlen(tmp) > 0) {
+        salon = strdup(tmp);
+        free(tmp);
         _log("# Vous avez bien rejoint le salon <%s>\n", salon);
     } else {
         _log("# Vous avez bien rejoint le salon\n");
