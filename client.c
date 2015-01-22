@@ -15,7 +15,6 @@
 #include <pthread.h>
 #include <stdarg.h>
 #include <regex.h>
-#include <Python/Python.h>
 
 #include "protocole.h"
 #include "client.h"
@@ -40,11 +39,13 @@ socklen_t addr_len;
 * Thread d'écoute serveur
 */
 pthread_t communicate_pthread;
+pthread_attr_t communication_pthread_attr;
 
 /**
 * Thread d'écoute serveur
 */
 pthread_t alive_pthread;
+pthread_attr_t alive_pthread_attr;
 
 /**
 * Nom du client
@@ -52,18 +53,17 @@ pthread_t alive_pthread;
 char *nickname = "Anonymous";
 
 /**
-* Salons du client
-*/
-char *salons[];
-int nbSalons = 0;
-
-/**
 * Salon courant du client
 */
 char ** salon;
 
+void sigint(int signal) {
+    _log("\n# Fermeture de l'application... Veuillez patienter...\n");
+    pthread_exit(NULL);
+}
+
 int main(int argc, char *argv[]) {
-    char *input, *save;
+    char *input;
     char *command = "NOQUIT";
     char *address;
     char *port;
@@ -76,6 +76,8 @@ int main(int argc, char *argv[]) {
             _log(" (debug is active)");
         }
     }
+
+    signal(SIGINT, sigint);
 
     client_addr.sin_family = AF_INET;
     client_addr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -106,7 +108,11 @@ int main(int argc, char *argv[]) {
                     if (address && port) {
                         if (server(address, port) == 0) {
                             _log("# Connexion au serveur %s port %s établie\n", address, port);
-                            pthread_create(&alive_pthread, NULL, thread_alive, NULL);
+
+                            pthread_attr_init(&alive_pthread_attr);
+                            pthread_attr_setdetachstate(&alive_pthread_attr, PTHREAD_CREATE_JOINABLE);
+
+                            pthread_create(&alive_pthread, &alive_pthread_attr, thread_alive, NULL);
                         } else {
                             _log("# Connexion au serveur %s port %s échouée\n", address, port);
                         }
@@ -128,6 +134,7 @@ int main(int argc, char *argv[]) {
     } while (strcmp(command, "EXIT") != 0);
 
     _log("# Fermeture de l'application\n");
+    pthread_exit(NULL);
 
     return 0;
 }
@@ -233,8 +240,13 @@ int communicate(const char * command, char * message) {
     Communication *response;
     char input[3];
 
-    pthread_create(&communicate_pthread, NULL, thread_communicate, message);
+    pthread_attr_init(&communication_pthread_attr);
+    pthread_attr_setdetachstate(&communication_pthread_attr, PTHREAD_CREATE_JOINABLE);
+
+    pthread_create(&communicate_pthread, &communication_pthread_attr, thread_communicate, message);
     pthread_join(communicate_pthread, &retval);
+
+    pthread_attr_destroy(&communication_pthread_attr);
 
     response = (Communication *) retval;
 
@@ -318,6 +330,8 @@ void _quitHandler(const Communication *communication) {
         _log("# Fermeture de la connexion serveur...\n");
         pthread_join(communicate_pthread, NULL);
         pthread_join(alive_pthread, NULL);
+
+        pthread_attr_destroy(&alive_pthread_attr);
 
         close(sckt);
         sckt = -1;
