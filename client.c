@@ -507,28 +507,3 @@ int call_function(const char *name, Communication *param) {
 
     return -1;
 }
-
-/**
-* Ajoute un salon à la liste
-*/
-void addSalon(char * salon) {
-    salons[nbSalons] = strdup(salon);
-    nbSalons++;
-}
-
-/**
-* Rajoute un salon
-*/
-void removeSalon(char * salon) {
-    int i, index = -1;
-    char ** temp = (char **) malloc((nbSalons - 1) * sizeof(char *));
-
-    for (i = 0; i < nbSalons; i++) {
-        if (strcmp(salons[i], salon) != 0) {
-            temp[i] = (char *) malloc(strlen(salons[i] + 1) * sizeof(char));
-            temp[i] = strdup(salons[i]);
-        } else {
-            i--;
-        }
-    }
-}
