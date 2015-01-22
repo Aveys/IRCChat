@@ -38,24 +38,40 @@ socklen_t addr_len;
 /**
 * Thread d'écoute serveur
 */
-pthread_t communicate_pthread;
-pthread_attr_t communication_pthread_attr;
+pthread_t send_pthread;
+pthread_attr_t send_pthread_attr;
 
 /**
-* Thread d'écoute serveur
+* Thread d'envoie de ping
 */
 pthread_t alive_pthread;
 pthread_attr_t alive_pthread_attr;
 
 /**
+* Thread d'écoute serveur
+*/
+pthread_t listen_pthread;
+pthread_attr_t listen_pthread_attr;
+
+/**
+* Thread de blocage communicate
+*/
+pthread_mutex_t processing_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+/**
 * Nom du client
 */
-char *nickname = "Anonymous";
+char *_nickname = "Anonymous";
 
 /**
 * Salon courant du client
 */
-char * salon;
+char *_salon;
+
+/**
+* Communication en envoi
+*/
+Communication *_processing;
 
 void sigint(int signal) {
     _log("\n# Fermeture de l'application... Veuillez patienter...\n");
@@ -113,6 +129,11 @@ int main(int argc, char *argv[]) {
                             pthread_attr_setdetachstate(&alive_pthread_attr, PTHREAD_CREATE_JOINABLE);
 
                             pthread_create(&alive_pthread, &alive_pthread_attr, thread_alive, NULL);
+
+                            pthread_attr_init(&listen_pthread_attr);
+                            pthread_attr_setdetachstate(&listen_pthread_attr, PTHREAD_CREATE_JOINABLE);
+
+                            pthread_create(&listen_pthread, &listen_pthread_attr, thread_listen, NULL);
                         } else {
                             _log("# Connexion au serveur %s port %s échouée\n", address, port);
                         }
@@ -163,65 +184,54 @@ void _debug(const char *message, ...) {
 * @var var La chaine de caractère à envoyer
 * @return Communication
 */
-void *thread_communicate(void *var) {
-    Communication *communication = malloc(sizeof(Communication));
-    communication->code = -1;
+void *thread_send(void *var) {
+    _processing = malloc(sizeof(Communication));
+    _processing->code = -1;
 
-    struct Message message;
-    fd_set rfds;
-    struct timeval tv;
+    strcpy(_processing->request.message, (char *) var);
 
-    strcpy(communication->request.message, (char *) var);
-    char buffer[255];
-    char target[3];
-    int retval;
-
-    FD_ZERO(&rfds);
-    FD_SET(sckt, &rfds);
-
-    tv.tv_sec = 5;
-    tv.tv_usec = 0;
-
-    if (sendto(sckt, &communication->request, sizeof(communication->request) + 1, 0, (struct sockaddr *) &serv_addr, addr_len) == -1) {
+    if (sendto(sckt, &_processing->request, sizeof(_processing->request) + 1, 0, (struct sockaddr *) &serv_addr, addr_len) == -1) {
         perror("sendto()");
     }
 
-    // Timeout de 5 secondes pour la réception d'un ACK
-    retval = select(sckt + 1, &rfds, NULL, NULL, &tv);
+    _processing->requested = time(NULL);
 
-    if (retval == -1) {
-        perror("select()");
-    } else if (retval && FD_ISSET(sckt, &rfds)) {
-        if (recvfrom(sckt, &communication->response, sizeof(communication->response), 0, (struct sockaddr *) &serv_addr, &addr_len) > 0) {
-            strncpy(target, communication->response.message, 3);
-
-            if (strcmp("ACK", buffer) == 0) {
-                communication->code = 1;
-            } else if (strcmp("ERR", buffer) == 0) {
-                communication->code = 2;
-            }
-        }
-    }
-
-    return communication;
+    return NULL;
 }
 
 /**
-* Thread d'envoi de ping au serveur
+* Envoie une communication avec le serveur avec un thread non bloquant
 *
-* @var var
+* @var var La chaine de caractère à envoyer
+* @return Communication
 */
-void *thread_alive(void *var) {
-    Communication *response;
+void *thread_listen(void *var) {
+    Communication * communication = malloc(sizeof(Communication));
+    char target[3];
 
     while (sckt != -1) {
-        response = thread_communicate((void *) "ALIVE");
+        if (recvfrom(sckt, &communication->response, sizeof(communication->response), 0, (struct sockaddr *) &serv_addr, &addr_len) > 0) {
+            char * command = getPartOfCommand(communication->response.message, 1);
 
-        if (!response->code) {
-            _log("# Connexion au serveur perdue...");
+            strncpy(target, communication->response.message, 3);
+
+            if (_processing) {
+                if (strcmp("ACK", target) == 0) {
+                    _processing->code = 1;
+                    pthread_mutex_unlock(&processing_mutex);
+                } else if (strcmp("ERR", target) == 0) {
+                    _processing->code = 2;
+                    pthread_mutex_unlock(&processing_mutex);
+                }
+
+                // Si on a pas reçu d'ACK mais que la requête est toujours en attente, on débloque
+                if ((time(NULL) - _processing->requested) > 5) {
+                    pthread_mutex_unlock(&processing_mutex);
+                }
+            } else {
+                call_function(command, communication);
+            }
         }
-
-        sleep(TIMEOUT);
     }
 
     return NULL;
@@ -237,24 +247,26 @@ void *thread_alive(void *var) {
 */
 int communicate(const char * command, char * message) {
     void *retval;
-    Communication *response;
     char input[3];
 
-    pthread_attr_init(&communication_pthread_attr);
-    pthread_attr_setdetachstate(&communication_pthread_attr, PTHREAD_CREATE_JOINABLE);
+    pthread_attr_init(&send_pthread_attr);
+    pthread_attr_setdetachstate(&send_pthread_attr, PTHREAD_CREATE_JOINABLE);
 
-    pthread_create(&communicate_pthread, &communication_pthread_attr, thread_communicate, message);
-    pthread_join(communicate_pthread, &retval);
+    pthread_create(&send_pthread, &send_pthread_attr, thread_send, message);
+    pthread_join(send_pthread, &retval);
 
-    pthread_attr_destroy(&communication_pthread_attr);
+    pthread_attr_destroy(&send_pthread_attr);
 
-    response = (Communication *) retval;
+    // On bloque ici en attente d'avoir l'ACK, si on ne reçois pas
+    _debug("Locked");
+    pthread_mutex_lock(&processing_mutex);
+    _debug("Unlocked");
 
     // Test de la valeur de retour
-    if (response->code) {
-        call_function(command, response);
-        free(response);
+    if (_processing->code) {
+        call_function(command, _processing);
 
+        free(_processing);
         return 0;
     } else {
         _log("# Le message n'a pas été reçu par le serveur, voulez-vous le renvoyer ? (Yes/no)");
@@ -266,9 +278,29 @@ int communicate(const char * command, char * message) {
         }
     }
 
-    free(response);
+    free(_processing);
 
     return 1;
+}
+
+/**
+* Thread d'envoi de ping au serveur
+*
+* @var var
+*/
+void *thread_alive(void *var) {
+    struct Message message;
+    strcpy(message.message, "ALIVE");
+
+    while (sckt != -1) {
+        if (sendto(sckt, &message, sizeof(message) + 1, 0, (struct sockaddr *) &serv_addr, addr_len) == -1) {
+            perror("sendto()");
+        }
+
+        sleep(TIMEOUT);
+    }
+
+    return NULL;
 }
 
 /**
@@ -308,9 +340,9 @@ void _joinHandler(const Communication *communication) {
     char * tmp = getPartOfCommand(&communication->request.message[0], 2);
 
     if (strlen(tmp) > 0) {
-        salon = strdup(tmp);
+        _salon = strdup(tmp);
         free(tmp);
-        _log("# Vous avez bien rejoint le salon <%s>\n", salon);
+        _log("# Vous avez bien rejoint le salon <%s>\n", _salon);
     } else {
         _log("# Vous avez bien rejoint le salon\n");
     }
@@ -330,10 +362,13 @@ void _partHandler(const Communication *communication) {
 void _quitHandler(const Communication *communication) {
     if (sckt != -1) {
         _log("# Fermeture de la connexion serveur...\n");
-        pthread_join(communicate_pthread, NULL);
+        pthread_join(send_pthread, NULL);
         pthread_join(alive_pthread, NULL);
+        pthread_join(listen_pthread, NULL);
 
+        pthread_attr_destroy(&send_pthread_attr);
         pthread_attr_destroy(&alive_pthread_attr);
+        pthread_attr_destroy(&listen_pthread_attr);
 
         close(sckt);
         sckt = -1;
@@ -347,8 +382,8 @@ void _nickHandler(const Communication *communication) {
     char *tmp = getPartOfCommand(communication->request.message, 2);
 
     if (strcmp("ACK_NICKMODIFIED", communication->response.message)) {
-        nickname = strdup(tmp);
-        _log("# Votre pseudonyme a bien été changé en <%s>\n", nickname);
+        _nickname = strdup(tmp);
+        _log("# Votre pseudonyme a bien été changé en <%s>\n", _nickname);
     } else if (strcmp("ERR_NICKALREADYUSED", communication->response.message)) {
         _log("# Le pseudonyme <> demandé est déjà utilisé\n");
     }
@@ -359,7 +394,7 @@ void _nickHandler(const Communication *communication) {
 void _messageHandler(const Communication *communication) {
     _debug("MESSAGE");
 
-    _log("<%s> %s\n", nickname, communication->response.message);
+    _log("<%s> %s\n", _nickname, communication->response.message);
 }
 
 void _helpHandler(const Communication *response) {
