@@ -59,11 +59,11 @@ int main(int argc, char *argv[]) {
 
         printf("Structure reçu : %s, %s\n",msg.message,msg.salonCible); //DEBUG
 
-        if (strcmp(msg.message,"CONNECT")==0){// Vérification que le message commence par CONNECT
+        if (startsWith("CONNECT",msg.message) == 1){// Vérification que le message commence par CONNECT
 
             printf("Demande de connection d'un nouveau client : %s\n", inet_ntoa(client_addr.sin_addr)); //DEBUG
-            Client recherche = findClient(client_addr);
-            if(strcmp(recherche.pseudo,"introuvable")==0){
+            int indice = findClient(client_addr);
+            if(indice==-1){
                 printf("Ajout du client\n");
                 strcpy(tmp.pseudo,"ANONYME");
                 tmp.socket_addr=client_addr;
@@ -72,15 +72,29 @@ int main(int argc, char *argv[]) {
                 // creation de la structure de réponse à la connection
                 strcpy(msg.message,"ACK_CONNECTED");
                 strcpy(msg.salonCible,"");
-                sendto(sd,&msg, sizeof(Message),0,(struct sockaddr *) &client_addr,addr_len);
+                envoyerMessageClient(tmp, msg);
             }
             else{
+                strcpy(tmp.pseudo,"ANONYME");
+                tmp.socket_addr=client_addr;
                 strcpy(msg.message,"ERR_IPALREADYUSED");
                 strcpy(msg.salonCible,"");
-                sendto(sd,&msg, sizeof(Message),0,(struct sockaddr *) &client_addr,addr_len);
+                envoyerMessageClient(tmp, msg);
             }
         }
-        else if (strcmp(msg.message, "NICK") == 0) {
+        else if (startsWith("NICK",msg.message) == 1) {
+            int indice = findClient(client_addr);
+            int indiceSalon=-1;
+            char *nickname;
+            strcpy(nickname,msg.message);
+            nickname+=5;
+            printf("Changement de pseudonyme de %s en %s",clients[indice].pseudo,nickname);
+            for (int i = 0; i < nbSalons; ++i) {
+                if( (indiceSalon = trouverClientDansSalon(salons[i], client_addr))!= -1){
+
+                }
+            }
+
 
         }
         else if (strcmp(msg.message, "JOIN") == 0) {
@@ -111,20 +125,31 @@ int main(int argc, char *argv[]) {
         }
     }
 }
-
-struct Client findClient(struct sockaddr_in adresse){
+//renvoi l'indice du client dans le tableau
+int findClient(struct sockaddr_in adresse){
     struct sockaddr_in c;
     for (int i = 0; i < nbClients; i++) {
-        c=clients[nbClients].socket_addr;
+        c=clients[i].socket_addr;
         if(strcmp(inet_ntoa(adresse.sin_addr),inet_ntoa(c.sin_addr))==0){
             printf("Client trouvé\n");
-            return clients[nbClients];
+            return i;
         }
     }
     printf("Utilisateur %s introuvable\n",inet_ntoa(adresse.sin_addr));
-    struct Client tmp;
-    strcpy(tmp.pseudo,"introuvable");
-    return tmp;
+    return -1;
+}
+//renvoi l'indice du client dans le salon
+int trouverClientDansSalon(struct Salon s,struct sockaddr_in adresse){
+    struct sockaddr_in c;
+    for (int i = 0; i < s.nbClient; i++) {
+        c=s.clients[i].socket_addr;
+        if(strcmp(inet_ntoa(adresse.sin_addr),inet_ntoa(c.sin_addr))==0){
+            printf("Client trouvé dans le salon %s\n",s.name);
+            return i;
+        }
+    }
+    printf("Utilisateur %s introuvable dans le salon %s\n",inet_ntoa(adresse.sin_addr),s.name);
+    return -1;
 }
 struct Message listeSalon(){
     struct Message ret;
@@ -162,7 +187,16 @@ void envoyerMessageSalon(struct Salon salon, struct Message msg){
         envoyerMessageClient(c,msg);
     }
 }
-
+int VerifierUtilisationPseudonyme(char pseudonyme[]){
+    int ret=0;
+    struct Client tmp;
+    for (int i = 0; i < nbClients; ++i) {
+        tmp = clients[i];
+        if(strcmp(pseudonyme,tmp.pseudo)==0)
+            ret=1;
+    }
+    return ret;
+}
 void* realloc_s (void **ptr, size_t taille){
     void *ptr_realloc = realloc(*ptr, taille);
 
@@ -172,10 +206,10 @@ void* realloc_s (void **ptr, size_t taille){
 
     return ptr_realloc;
 }
-/*
+
 int startsWith(const char *pre, const char *str)
 {
     size_t lenpre = strlen(pre),
             lenstr = strlen(str);
     return lenstr < lenpre ? 0 : strncmp(pre, str, lenpre) == 0;
-}*/
+}
