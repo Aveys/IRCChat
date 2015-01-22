@@ -17,10 +17,11 @@ int nbClients=0;
 struct Salon salons[MAX_SALONS];//tableau des salons crées
 int nbSalons=0;
 int sd;
+char time_serveur[80];
 
 int main(int argc, char *argv[]) {
     //INITIALISATION DES VARIABLES GLOBALES
-    pthread_t thread;
+
     int n;
 
     socklen_t addr_len;
@@ -45,22 +46,33 @@ int main(int argc, char *argv[]) {
     }
 
     struct Client tmp;
-
+    char *nickname;
+    int indiceSalon=-1;
+    char *messageRetour;
+    char *ancienPseudo;
+    int indice ;
+    int indiceClient;
+    char* nomSalon;
+    char *message;
+    printf("------ Lancement du serveur ------\n");
     for (; ;) {
         // bloc de réception des clients
-        printf("En attente d'une trame\n");
+        getDateTime(time_serveur);
+        printf("%sEn attente d'une trame\n",time_serveur);
         addr_len = sizeof(client_addr);
         n = recvfrom(sd,&msg, sizeof(Message), 0, (struct sockaddr *) &client_addr, &addr_len);
         if (n == -1)
             perror("recvfrom");
-
-        printf("Structure reçu : %s, %s\n",msg.message,msg.salonCible); //DEBUG
+        getDateTime(time_serveur);
+        printf("%sStructure reçu : %s, %s\n",time_serveur,msg.message,msg.salonCible); //DEBUG
 
         if (startsWith("CONNECT",msg.message) == 1){ // Vérification que le message commence par CONNECT
-            printf("----- Demande de connection d'un nouveau client : %s -------\n", inet_ntoa(client_addr.sin_addr)); //DEBUG
+            getDateTime(time_serveur);
+            printf("%s----- Demande de connection d'un nouveau client : %s -------\n",time_serveur, inet_ntoa(client_addr.sin_addr)); //DEBUG
             int indice = findClient(client_addr);
             if(indice==-1){
-                printf("Ajout du client\n");
+                getDateTime(time_serveur);
+                printf("%sAjout du client\n",time_serveur);
                 strcpy(tmp.pseudo,"ANONYME");
                 tmp.socket_addr=client_addr;
                 clients[nbClients]=tmp;
@@ -79,26 +91,24 @@ int main(int argc, char *argv[]) {
             }
         }
         else if (startsWith("NICK",msg.message) == 1) {
-            printf("----- Demande de Changement de Pseudonyme ------\n");
-            int indice = findClient(client_addr);
-            printf("INDICE CLIENT : %i\n",indice);
+            getDateTime(time_serveur);
+            printf("%s----- Demande de Changement de Pseudonyme ------\n",time_serveur);
+            indice = findClient(client_addr);
+            printf("%sINDICE CLIENT : %i\n",time_serveur,indice);
 
-            int indiceSalon=-1;
-            char *nickname;
-            char *messageRetour;
-            char *ancienPseudo;
+
 
             printClients(); //DEBUG : affiche liste des clients
-            printf("Pseudo actuel : %s\n",clients[indice].pseudo);
+            printf("%sPseudo actuel : %s\n",time_serveur,clients[indice].pseudo);
             strcpy(ancienPseudo,clients[indice].pseudo);
-            printf("Ancien pseudo : %s\n",ancienPseudo);//SEGMENTFAULT
+            //printf("%sAncien pseudo : %s\n",time_serveur,ancienPseudo);//SEGMENTFAULT
             strcpy(nickname,msg.message);
             nickname+=5;
-            printf("Changement de pseudonyme de %s en %s\n",clients[indice].pseudo,nickname);
+            printf("%sChangement de pseudonyme de %s en %s\n",time_serveur,clients[indice].pseudo,nickname);
             strcpy(clients[indice].pseudo,nickname);// on modifie le client dans la structure client
             for (int i = 0; i < nbSalons; ++i) {
                 if( (indiceSalon = trouverClientDansSalon(salons[i], client_addr))!= -1){
-                    printf("Utilisateur trouvé dans le salon %s\n",salons[indiceSalon].name);
+                    printf("%sUtilisateur trouvé dans le salon %s\n",time_serveur,salons[indiceSalon].name);
                     strcpy(salons[i].clients[indiceSalon].pseudo,nickname);// on modifie le nickname dans la structure du salon
                     sprintf(messageRetour,"NICKMODIFIED %s %s",ancienPseudo,nickname);
                     //printf("Envoi de la trame : %s\n",messageRetour);
@@ -114,21 +124,20 @@ int main(int argc, char *argv[]) {
             envoyerMessageClient(client_addr, msg);
         }
         else if (startsWith("JOIN",msg.message) == 1) {
-            printf("------- Demande de d'acces à un salon -------\n");
-            int indiceClient = findClient(client_addr);
-            char* nomSalon;
+            printf("%s------- Demande de d'acces à un salon -------\n",time_serveur);
+            indiceClient = findClient(client_addr);
             strcpy(nomSalon,msg.message);
             nomSalon+=5;
-            printf("L'utilisateur %s veut acceder au salon %s \n",clients[indiceClient].pseudo,nomSalon);
-            joindreSalon(nomSalon,clients[indiceClient]);
+            struct Client c = clients[indiceClient];
+            printf("%sL'utilisateur %s veut acceder au salon %s \n",time_serveur,clients[indiceClient].pseudo,nomSalon);
+            joindreSalon(nomSalon,&c);
             strcpy(msg.message,"ACK_JOIN");
             strcpy(msg.salonCible,nomSalon);
             envoyerMessageClient(client_addr, msg);
         }
         else if (startsWith( "MESSAGE",msg.message) == 1) {
-            int indiceSalon = findSalon(msg.salonCible);
-            int indiceClient = findClient(client_addr);
-            char *message,*messageRetour;
+            indiceSalon = findSalon(msg.salonCible);
+            indiceClient = findClient(client_addr);
             strcpy(message,msg.message);
             message+=8;
             sprintf(messageRetour,"MESSAGED %s %s",clients[indiceClient].pseudo,message);
@@ -156,6 +165,9 @@ int main(int argc, char *argv[]) {
             fputs("USER a demandé de l'aide", stdout);
             msg = listeSalon();
             envoyerMessageClient(client_addr, msg);
+        }
+        else if (startsWith("ALIVE",msg.message) == 1) {
+            printf("%s------- L'utilisateur %s:%s a signalé qu'il était vivant ---------",time_serveur,clients[indiceClient].pseudo,inet_ntoa(client_addr.sin_addr));
         }
         else {
             fputs("Commande non reconnue", stdout);
@@ -197,10 +209,11 @@ struct Client getCurrentClient(struct sockaddr_in adresse){
 
 struct Message listeSalon(){
     struct Message ret;
-    strcpy(ret.salonCible,"NULL");
+    strcpy(ret.salonCible,"");
     strcpy(ret.message,"ACK_LIST");
     for(int i=0;i<nbSalons;i++){
-        strcat(ret.message," ");
+        if(i!=0)
+            strcat(ret.message,", ");
         strcat(ret.message,salons[nbSalons].name);
     }
     return ret;
@@ -209,18 +222,16 @@ struct Message listeSalon(){
 struct Message listeCommandes(){
     struct Message ret;
     strcpy(ret.message,"ACK_HELP /SERVER <@IP>: Demander la connexion au serveur \n - /NICK <pseudonyme>: Changer de pseudonyme \n - /JOIN <Salon>: Rejoindre un serveur \n - /PART : Quitter le salon \n - /LIST : Lister les salons ouverts \n - /HELP : Afficher la liste des commandes possibles\n");
-    strcpy(ret.salonCible,"NULL");
+    strcpy(ret.salonCible,"");
     return ret;
 }
 
 struct Message erreurCommande(){
     struct Message ret;
-    strcpy(ret.salonCible,"NULL");
+    strcpy(ret.salonCible,"");
     strcpy(ret.message,"ERR_CMDUNKNOWN");
     return ret;
 }
-
-
 
 int findSalon(char *nomSalon){
     int indice = -1;
@@ -230,28 +241,32 @@ int findSalon(char *nomSalon){
     }
     return indice;
 }
-struct Message joindreSalon(char* nomSalon,struct Client c){
+struct Message joindreSalon(char* nomSalon, struct Client *c){
     //Vérifier si le salon existe
     int existe=0;
     Salon s;
     existe = findSalon(nomSalon);
     //SI n'existe pas ALORS création du salon
     if(existe == -1){
-        printf("Salon inexistant : creation \n");
         strcpy(s.name,nomSalon);
+        s.nbClient=0;
         salons[nbSalons]=s;
         existe = nbSalons;
         nbSalons++;
-    }
-    //Ajout du client au salon
-    s.clients[0]=c;
-    s.nbClient++;
 
+    }
+
+    //Ajout du client au salon
+    salons[existe].clients[salons[existe].nbClient]=*c;
+    salons[existe].nbClient++;
+
+    s=salons[existe];
     //Informer autres clients
     struct Message ret;
     strcpy(ret.salonCible,s.name);
     strcpy(ret.message,"CHANJOINED ");
-    strcat(ret.message,c.pseudo);
+    strcat(ret.message,c->pseudo);
+
     envoyerMessageSalon(s, ret); // Envoi du message à tous les clients du salon
 
     strcpy(ret.message,"ACK_JOIN"); // Message de retour client
@@ -261,14 +276,14 @@ struct Message joindreSalon(char* nomSalon,struct Client c){
 
 void envoyerMessageClient(struct sockaddr_in adresse,struct Message msg){
     time_t rawtime;
-    printf("# Envoi de la trame : %s avec salon %s à l'utilisateur en %s #\n",msg.message,msg.salonCible,inet_ntoa(adresse.sin_addr));
+    printf("### %sEnvoi de la trame : %s avec salon %s à l'utilisateur en %s ###\n",time_serveur,msg.message,msg.salonCible,inet_ntoa(adresse.sin_addr));
     time( &rawtime );
     msg.t=rawtime;
     sendto(sd,&msg,sizeof(Message),0, (struct sockaddr *)&adresse, sizeof(adresse));
 }
 // Envoi un message à tous les utilisateurs d'un salon
 void envoyerMessageSalon(struct Salon salon, struct Message msg){
-    printf("# Envoi de la trame : %s avec salon %s aux utilisateur(%i) du salon %s #\n",msg.message,msg.salonCible,salon.nbClient,salon.name);
+    printf("### %sEnvoi de la trame : %s avec salon %s aux utilisateur(%i) du salon %s ###\n",time_serveur,msg.message,msg.salonCible,salon.nbClient,salon.name);
     struct Client c;
     for (int i = 0; i < salon.nbClient; i++) {
         c=salon.clients[i];
@@ -322,4 +337,11 @@ void decalageClientDansSalon(Salon s, int pos){
     for (int i = pos+1; i < s.nbClient; i++) {
         s.clients[i]=s.clients[i+1];
     }
+}
+void getDateTime(char *t){
+    time_t rawtime;
+    struct tm *info;
+    time( &rawtime );
+    info = localtime( &rawtime );
+    strftime(t,80,"%d/%m/%Y - %H:%M:%S : ", info);
 }

@@ -1,5 +1,5 @@
 #define MAX_NAME 20
-#define MAX_MESSAGE 250
+#define MAX_MESSAGE 255
 #define MAX_SALONS 10
 #define MAX_CLIENTS 20
 

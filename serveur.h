@@ -1,7 +1,7 @@
 struct Message listeSalon();
 struct Message listeCommandes();
 struct Message erreurCommande();
-struct Message joindreSalon(char* nomSalon,struct Client c);
+struct Message joindreSalon(char* nomSalon, struct Client *c);
 struct Message quitterSalon(char* nomSalon,struct Client c);
 int findClient(struct sockaddr_in adresse);
 int findSalon(char *nomSalon);
@@ -15,3 +15,4 @@ void printSalons();
 void decalageClient(int pos);
 void decalageSalon(int pos);
 void decalageClientDansSalon(Salon s, int pos);
+void getDateTime(char *t);
