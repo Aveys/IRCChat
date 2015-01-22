@@ -15,6 +15,7 @@
 #include <pthread.h>
 #include <stdarg.h>
 #include <regex.h>
+#include <Foundation/Foundation.h>
 
 #include "protocole.h"
 #include "client.h"
@@ -271,7 +272,7 @@ int communicate(const char * command, char * message) {
     pthread_attr_destroy(&send_pthread_attr);
 
     // On bloque ici en attente d'avoir l'ACK, si on ne reçois pas
-    _debug("Locked");
+    _log("#DEBUG: Locked %s", message);
     pthread_mutex_lock(&_processing_mutex);
     _debug("Unlocked");
 
