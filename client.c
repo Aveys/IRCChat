@@ -56,7 +56,7 @@ pthread_attr_t listen_pthread_attr;
 /**
 * Thread de blocage communicate
 */
-pthread_mutex_t processing_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t _processing_mutex;
 
 /**
 * Nom du client
@@ -95,6 +95,9 @@ int main(int argc, char *argv[]) {
 
     signal(SIGINT, sigint);
 
+    pthread_mutex_init(&_processing_mutex, NULL);
+    pthread_mutex_lock(&_processing_mutex);
+
     client_addr.sin_family = AF_INET;
     client_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     client_addr.sin_port = htons(0);
@@ -125,15 +128,19 @@ int main(int argc, char *argv[]) {
                         if (server(address, port) == 0) {
                             _log("# Connexion au serveur %s port %s établie\n", address, port);
 
-                            pthread_attr_init(&alive_pthread_attr);
-                            pthread_attr_setdetachstate(&alive_pthread_attr, PTHREAD_CREATE_JOINABLE);
-
-                            pthread_create(&alive_pthread, &alive_pthread_attr, thread_alive, NULL);
-
                             pthread_attr_init(&listen_pthread_attr);
                             pthread_attr_setdetachstate(&listen_pthread_attr, PTHREAD_CREATE_JOINABLE);
 
+                            _debug("main -> creating thread_listen");
                             pthread_create(&listen_pthread, &listen_pthread_attr, thread_listen, NULL);
+
+                            communicate("CONNECT", "CONNECT");
+
+                            pthread_attr_init(&alive_pthread_attr);
+                            pthread_attr_setdetachstate(&alive_pthread_attr, PTHREAD_CREATE_JOINABLE);
+
+                            _debug("main -> creating thread_alive");
+                            pthread_create(&alive_pthread, &alive_pthread_attr, thread_alive, NULL);
                         } else {
                             _log("# Connexion au serveur %s port %s échouée\n", address, port);
                         }
@@ -174,7 +181,13 @@ void _log(const char *message, ...) {
 
 void _debug(const char *message, ...) {
     if (debug == 1) {
-        printf("# DEBUG: %s\n", message);
+        time_t current;
+        struct tm date;
+
+        time(&current);
+        date = *localtime(&current);
+
+        printf("#DEBUG: %s\n", message);
     }
 }
 
@@ -210,7 +223,10 @@ void *thread_listen(void *var) {
     char target[3];
 
     while (sckt != -1) {
+        _debug("thread_listen -> Waiting...");
         if (recvfrom(sckt, &communication->response, sizeof(communication->response), 0, (struct sockaddr *) &serv_addr, &addr_len) > 0) {
+            _debug("thread_listen -> Received");
+
             char * command = getPartOfCommand(communication->response.message, 1);
 
             strncpy(target, communication->response.message, 3);
@@ -218,15 +234,13 @@ void *thread_listen(void *var) {
             if (_processing) {
                 if (strcmp("ACK", target) == 0) {
                     _processing->code = 1;
-                    pthread_mutex_unlock(&processing_mutex);
+                    pthread_mutex_unlock(&_processing_mutex);
                 } else if (strcmp("ERR", target) == 0) {
                     _processing->code = 2;
-                    pthread_mutex_unlock(&processing_mutex);
-                }
-
-                // Si on a pas reçu d'ACK mais que la requête est toujours en attente, on débloque
-                if ((time(NULL) - _processing->requested) > 5) {
-                    pthread_mutex_unlock(&processing_mutex);
+                    pthread_mutex_unlock(&_processing_mutex);
+                } else if ((time(NULL) - _processing->requested) > 5) {
+                    // Si on a pas reçu d'ACK mais que la requête est toujours en attente, on débloque
+                    pthread_mutex_unlock(&_processing_mutex);
                 }
             } else {
                 call_function(command, communication);
@@ -246,20 +260,19 @@ void *thread_listen(void *var) {
 * @return 0 on success, 1 on error
 */
 int communicate(const char * command, char * message) {
-    void *retval;
     char input[3];
 
     pthread_attr_init(&send_pthread_attr);
     pthread_attr_setdetachstate(&send_pthread_attr, PTHREAD_CREATE_JOINABLE);
 
-    pthread_create(&send_pthread, &send_pthread_attr, thread_send, message);
-    pthread_join(send_pthread, &retval);
+    pthread_create(&send_pthread, &send_pthread_attr, thread_send, (void *) message);
+    pthread_join(send_pthread, NULL);
 
     pthread_attr_destroy(&send_pthread_attr);
 
     // On bloque ici en attente d'avoir l'ACK, si on ne reçois pas
     _debug("Locked");
-    pthread_mutex_lock(&processing_mutex);
+    pthread_mutex_lock(&_processing_mutex);
     _debug("Unlocked");
 
     // Test de la valeur de retour
@@ -330,7 +343,7 @@ int server(const char *address, const char *port) {
 
     addr_len = sizeof(serv_addr);
 
-    return communicate("CONNECT", message);
+    return 0;
 }
 
 /**
@@ -486,8 +499,6 @@ char *getPartOfCommand(const char *command, int part) {
                 strncpy(value, &command[start], size);
                 value[size] = '\0';
             }
-
-            _log("# salon %d %d %d %s\n", start, end, size, value);
         } else {
             _debug("getPartofCommand -> No Match");
         }
