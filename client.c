@@ -179,7 +179,7 @@ void _refreshScreen(void) {
     printf("\033[1;1H\033[2J");
 
     if (_salon) {
-        printf("# Salon \033[0;32m%s\033[0;37m\n", _salon);
+        printf("# SALON ACTUEL \033[0;32m%s\033[0;37m\n", _salon);
     }
 
     if (_nbMessages > 0) {
@@ -500,7 +500,7 @@ void _messageHandler(const Communication *communication) {
     strftime(format, 128, "%H:%M", &date);
 
     if (strcmp("ERR_NOCHANNELJOINED", communication->response.message) == 0) {
-        _log("# Vous avez demandé à quitter un salon que vous n'aviez pas rejoint\n");
+        _log("# Vous n'avez pas rejoint de salon\n");
     } else {
         char * message = getPartOfCommand(communication->request.message, 2);
 
@@ -510,8 +510,37 @@ void _messageHandler(const Communication *communication) {
     }
 }
 
+
 /**
-* Handler d'un envoi de message
+* Handler de réception de communication
+* @var Communication la communication liée
+*/
+void _messagedHandler(const Communication *communication) {
+    _debug("MESSAGED");
+
+    time_t current;
+    struct tm date;
+    char format[128];
+
+    if (strcmp(communication->response.salonCible, _salon) == 0) {
+        time(&current);
+        date = *localtime(&current);
+
+        strftime(format, 128, "%H:%M", &date);
+
+        char * message = getPartOfCommand(communication->request.message, 2);
+        char * nickname;
+        char * content;
+
+        nickname = strtok(message, " ");
+        content = strtok(NULL, " ");
+
+        _log("%s <\033[1m\033[41m%s\033[0;37m> %s\n", format, nickname, content);
+    }
+}
+
+/**
+* Handler de réception de communication
 * @var Communication la communication liée
 */
 void _helpHandler(const Communication *communication) {
@@ -520,6 +549,69 @@ void _helpHandler(const Communication *communication) {
     char * message = getPartOfCommand(communication->request.message, 2);
 
     _log("# Commandes disponible: %s", message);
+
+    free(message);
+}
+
+/**
+* Handler de réception de communication
+* @var Communication la communication liée
+*/
+void _chanJoinedHandler(const Communication *communication) {
+    _debug("CHANJOINED");
+    char * user;
+
+    if (strcmp(communication->response.salonCible, _salon) == 0) {
+        user = getPartOfCommand(communication->request.message, 2);
+
+        _log("# Le salon a été rejoint par %s \n", user);
+
+        free(user);
+    }
+}
+
+
+/**
+* Handler de réception de communication
+* @var Communication la communication liée
+*/
+void _chanLeavedHandler(const Communication *communication) {
+    _debug("CHANLEAVED");
+    char * user;
+
+    if (strcmp(communication->response.salonCible, _salon) == 0) {
+        user = getPartOfCommand(communication->request.message, 2);
+
+        _log("# Le salon a été quitté par %s \n", user);
+
+        free(user);
+    }
+
+    _log("# Le salon a été quitté par %s\n", user, communication->response.message);
+}
+
+
+/**
+* Handler de réception de communication
+* @var Communication la communication liée
+*/
+void _nickModifiedHandler(const Communication *communication) {
+    _debug("NICKMODIFIED");
+
+    char * message;
+    char * old;
+    char * new;
+
+    if (strcmp(communication->response.salonCible, _salon) == 0) {
+        message = getPartOfCommand(communication->request.message, 2);
+
+        old = strtok(message, " ");
+        new = strtok(NULL, " ");
+
+        _log("# L'utilisateur %s est maintenant connu sous le nom de %s\n", old, new);
+
+        free(message);
+    }
 }
 
 /**
@@ -536,7 +628,11 @@ const static struct {
         {"LIST", _listHandler},
         {"HELP", _helpHandler},
         {"NICK", _nickHandler},
-        {"MESSAGE", _messageHandler}
+        {"MESSAGE", _messageHandler},
+        {"CHANJOINED", _chanJoinedHandler},
+        {"CHANLEAVED	", _chanLeavedHandler},
+        {"MESSAGED", _messagedHandler},
+        {"NICKMODIFIED", _nickModifiedHandler}
 };
 
 /**
@@ -634,23 +730,42 @@ void addMessage(char * message) {
     }
 }
 
-void removeSalon(char * salon) {
-    int i, index = -1;
+/**
+* Recherche un salon dans la liste de salon
+* @var salon Le salon a rechercher
+*/
+int searchSalon(char * salon) {
+    int i = -1;
 
     for (i = 0; i < _nbSalons; i++) {
         if (strcmp(_salons[i], salon) == 0) {
-            index = i;
-            break;
+            return i;
         }
     }
 
-    for(i = index; i < _nbSalons; i++) {
-        _salons[i] = _salons[i+1];
-    }
-
-    _nbSalons--;
+    return i;
 }
 
+/**
+* Supprime un salon de la liste de salons
+* @var salon Le salon à supprimer
+*/
+void removeSalon(char * salon) {
+    int i = searchSalon(salon);
+
+    if (i >= 0) {
+        for(i = i; i < _nbSalons; i++) {
+            _salons[i] = _salons[i+1];
+        }
+
+        _nbSalons--;
+    }
+}
+
+/**
+* Ajoute un salon à la lise de salon
+* @var salon Le salon à ajouter
+*/
 void addSalon(char * salon) {
     if (_nbSalons < 10) {
         _salons[_nbSalons] = malloc(sizeof(char) * (strlen(salon) + 1));
