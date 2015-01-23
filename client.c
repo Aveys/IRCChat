@@ -285,19 +285,16 @@ void *thread_listen(void *var) {
                 _log("# La commande n'est pas reconnue par le serveur\n");
             } else if (strcmp("ACK_ALIVE", communication->response.message) == 0) {
                 testProcessingRequestTime();
-            } else if (_processing) {
-                if (strcmp("ACK", target) == 0) {
+            } else if (strcmp("ACK", target) == 0 && _processing) {
                     _debug(target);
                     _processing->code = 1;
                     pthread_mutex_unlock(&_processing_mutex);
-                } else if (strcmp("ERR", target) == 0) {
+            } else if (strcmp("ERR", target) == 0 && _processing) {
                     _processing->code = 2;
                     pthread_mutex_unlock(&_processing_mutex);
-                } else {
-                    testProcessingRequestTime();
-                }
             } else {
                 command = getPartOfCommand(communication->response.message, 1);
+                _debug(command);
                 call_function(command, communication);
 
                 free(command);
@@ -496,16 +493,12 @@ void _messageHandler(const Communication *communication) {
 
     strftime(format, 128, "%H:%M", &date);
 
-
-
     if (strcmp("ERR_NOCHANNELJOINED", communication->response.message) == 0) {
         _log("# Vous n'avez pas rejoint de salon\n");
     } else {
         char * message = getPartOfCommand(communication->request.message, 2);
 
         _log("%s <\033[1m\033[41m%s\033[0;37m> %s\n", format, _nickname, message);
-
-        free(message);
     }
 }
 
@@ -527,11 +520,12 @@ void _messagedHandler(const Communication *communication) {
 
         strftime(format, 128, "%H:%M", &date);
 
-        char * message = getPartOfCommand(communication->request.message, 2);
+        char * message = communication->response.message;
         char * nickname;
         char * content;
 
         nickname = strtok(message, " ");
+        nickname = strtok(NULL, " ");
         content = strtok(NULL, " ");
 
         _log("%s <\033[1m\033[41m%s\033[0;37m> %s\n", format, nickname, content);
@@ -545,11 +539,9 @@ void _messagedHandler(const Communication *communication) {
 void _helpHandler(const Communication *communication) {
     _debug("HELP");
 
-    char * message = getPartOfCommand(communication->request.message, 2);
+    char * message = getPartOfCommand(communication->response.message, 2);
 
     _log("# Commandes disponible: %s", message);
-
-    free(message);
 }
 
 /**
@@ -561,14 +553,11 @@ void _chanJoinedHandler(const Communication *communication) {
     char * user;
 
     if (strcmp(communication->response.salonCible, _salon) == 0) {
-        user = getPartOfCommand(communication->request.message, 2);
+        user = getPartOfCommand(communication->response.message, 2);
 
-        _log("# Le salon a été rejoint par %s \n", user);
-
-        free(user);
+        _log("# Le salon a été rejoint par %s\n", user);
     }
 }
-
 
 /**
 * Handler de réception de communication
@@ -579,11 +568,9 @@ void _chanLeavedHandler(const Communication *communication) {
     char * user;
 
     if (strcmp(communication->response.salonCible, _salon) == 0) {
-        user = getPartOfCommand(communication->request.message, 2);
+        user = getPartOfCommand(communication->response.message, 2);
 
         _log("# Le salon a été quitté par %s\n", user);
-
-        free(user);
     }
 }
 
@@ -600,14 +587,12 @@ void _nickModifiedHandler(const Communication *communication) {
     char * new;
 
     if (strcmp(communication->response.salonCible, _salon) == 0) {
-        message = getPartOfCommand(communication->request.message, 2);
+        message = getPartOfCommand(communication->response.message, 2);
 
         old = strtok(message, " ");
         new = strtok(NULL, " ");
 
         _log("# L'utilisateur %s est maintenant connu sous le nom de %s\n", old, new);
-
-        free(message);
     }
 }
 
