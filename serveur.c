@@ -10,7 +10,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pthread.h>
-#include <Python/Python.h>
 
 #define PORT_SERVEUR 1500
 
@@ -57,7 +56,7 @@ int main(int argc, char *argv[]) {
     struct Client tmp;//décalaration des variables utiles au fonctionnement A SUPPRIMER UNE FOIS LA FACTORISATION FAITE
 
     printf("------ Lancement du serveur ------\n");
-    for (; ;) {//TODO : factoriser tout ça
+    for (; ;) {//
         // bloc de réception des clients
         getDateTime(time_serveur);
         printf("%sEn attente d'une trame\n",time_serveur);
@@ -101,7 +100,7 @@ int main(int argc, char *argv[]) {
         else if (startsWith("QUIT",msg.message) == 1) {
             quitterServeur(client_addr);
         }
-        else if (startsWith("LIST",msg.message) == 1) {//TODO : debug
+        else if (startsWith("LIST",msg.message) == 1) {
             getDateTime(time_serveur);
             printf("%s --------- L'utilisateur %s a demandé la liste des salons ouvert ---------\n", time_serveur,inet_ntoa(client_addr.sin_addr));
             listeSalon(&msg);
@@ -271,7 +270,7 @@ int trouverClientDansSalon(struct Salon s,struct sockaddr_in adresse){
     return -1;
 }
 
-//Liste de tous les salons ouverts //TODO : tester
+//Liste de tous les salons ouverts //TODO : tester (TJS BUGGE et je sais pas pourquoi)
 void listeSalon(struct Message *message){
     char ret[MAX_MESSAGE];
     char salon[100];
@@ -333,6 +332,7 @@ struct Message joindreSalon(struct sockaddr_in adresse, char* nomSalon, struct C
         strcpy(ret.message, "ERR_ALREADYHERE");
         strcat(ret.message, c->pseudo);
         envoyerMessageClient(adresse,ret); // Envoi du message à tous les clients du salon
+        return ret;
     }
     else {
         //Informer autres clients
@@ -346,6 +346,7 @@ struct Message joindreSalon(struct sockaddr_in adresse, char* nomSalon, struct C
         salons[existe].nbClient++;
         strcpy(ret.message,"ACK_JOIN"); // Message de retour client
         strcpy(ret.salonCible,"NULL");
+        envoyerMessageClient(adresse, ret);
         return ret;
     }
 
@@ -447,7 +448,7 @@ void quitterSalon(struct sockaddr_in adresse,char *salonCible) {
 
         getDateTime(time_serveur);
 
-        printf("%s-------- suppression de l'utilisateur %s du salon %s ----------", time_serveur, clients[indice].pseudo, salonCible);
+        printf("%s-------- suppression de l'utilisateur %s du salon %s ----------\n", time_serveur, clients[indice].pseudo, salonCible);
         int indiceSalon = trouverClientDansSalon(salons[indice], adresse);
         decalageClientDansSalon(salons[indice], indiceSalon);
         salons[indice].nbClient--;
@@ -455,7 +456,7 @@ void quitterSalon(struct sockaddr_in adresse,char *salonCible) {
         if (salons[indice].nbClient == 0) {
             supression = 1;
             getDateTime(time_serveur);
-            printf("%s-------- Salon vide: supression du salon %s ----------", time_serveur, salonCible);
+            printf("%s-------- Salon vide: supression du salon %s ----------\n", time_serveur, salonCible);
             decalageSalon(indice);
             nbSalons--;
         }
@@ -471,7 +472,7 @@ void quitterSalon(struct sockaddr_in adresse,char *salonCible) {
     }
     else{
         getDateTime(time_serveur);
-        printf("%s-------- l'utilisateur %s est introuvable sur le salon %s ----------",time_serveur,clients[indice].pseudo,salonCible);
+        printf("%s-------- l'utilisateur %s est introuvable sur le salon %s ----------\n",time_serveur,clients[indice].pseudo,salonCible);
     }
 }
 //effectue les opération pour déconnecter un utilisateur (1: quitter les salons 2:quitter le serveur)
@@ -483,7 +484,7 @@ void quitterServeur(struct sockaddr_in adresse) {
             quitterSalon(adresse, salons[i].name);//on quitte tous les salons
         }
         getDateTime(time_serveur);
-        printf("%s-------- Suppression de l'utilisateur %s du serveur ----------",time_serveur,clients[indiceClient].pseudo);
+        printf("%s-------- Suppression de l'utilisateur %s du serveur ----------\n",time_serveur,clients[indiceClient].pseudo);
         decalageClient(indiceClient);
         nbClients--;
         strcpy(msg.salonCible, "");
@@ -492,7 +493,7 @@ void quitterServeur(struct sockaddr_in adresse) {
     }
     else{
         getDateTime(time_serveur);
-        printf("%s-------- l'utilisateur %s est introuvable sur le serveur ----------",time_serveur, inet_ntoa(adresse.sin_addr));
+        printf("%s-------- l'utilisateur %s est introuvable sur le serveur ----------\n",time_serveur, inet_ntoa(adresse.sin_addr));
         strcpy(msg.salonCible, "");
         strcpy(msg.message, "ERR_NOUSER");
         envoyerMessageClient(adresse, msg);
@@ -502,7 +503,7 @@ void quitterServeur(struct sockaddr_in adresse) {
 //actualise le teps d'un client
 void actualiserTempsClient(struct sockaddr_in adresse){
     getDateTime(time_serveur);
-    printf("%sMise à jout du temps de l'utilisateur %s",time_serveur, inet_ntoa(adresse.sin_addr));
+    printf("%sMise à jout du temps de l'utilisateur %s\n",time_serveur, inet_ntoa(adresse.sin_addr));
     time_t t;
     int indiceClient= findClient(adresse);
     time(&t);
@@ -517,15 +518,16 @@ void *thread_CheckClient(void *args){
     double diff;
     for(; ;){
         for (int i = 0; i < nbClients; ++i) {
+            sleep(20);
             getDateTime(time_serveur);
             fprintf(stdout,"%sLancement de la vérification du timeout client\n",time_serveur);
             diff=difftime(t, clients[i].estVivant);
             if(diff > TIMEOUT){
-                fprintf(stdout, "%s!!!!!!!!! Suppression de l'utilisateur %s : Timeout écoulé !!!!!!!!!!!!!",time_serveur,clients[i].pseudo);
+                fprintf(stdout, "%s!!!!!!!!! Suppression de l'utilisateur %s : Timeout écoulé !!!!!!!!!!!!!\n",time_serveur,clients[i].pseudo);
                 quitterServeur(clients[i].socket_addr);
             }
 
         }
-        sleep(TIMEOUT);
+
     }
 }
