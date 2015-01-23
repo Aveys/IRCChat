@@ -520,10 +520,10 @@ void *thread_CheckClient(void *args){
         for (int i = 0; i < nbClients; ++i) {
             sleep(20);
             getDateTime(time_serveur);
-            fprintf(stdout,"%sLancement de la vérification du timeout client\n",time_serveur);
+            fprintf(stdout,"%s[THREAD] - Lancement de la vérification du timeout client\n",time_serveur);
             diff=difftime(t, clients[i].estVivant);
             if(diff > TIMEOUT){
-                fprintf(stdout, "%s!!!!!!!!! Suppression de l'utilisateur %s : Timeout écoulé !!!!!!!!!!!!!\n",time_serveur,clients[i].pseudo);
+                fprintf(stdout, "%s[THREAD] - !!!!!!!!! Suppression de l'utilisateur %s : Timeout écoulé !!!!!!!!!!!!!\n",time_serveur,clients[i].pseudo);
                 quitterServeur(clients[i].socket_addr);
             }
 
