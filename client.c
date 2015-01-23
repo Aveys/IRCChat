@@ -286,14 +286,11 @@ void *thread_listen(void *var) {
             } else if (strcmp("ACK_ALIVE", communication->response.message) == 0) {
                 testProcessingRequestTime();
             } else if (_processing) {
-                _debug("thread_listen -> if _processing");
                 _debug(target);
                 if (strcmp("ACK", target) == 0) {
-                    _debug("thread_listen -> ACK");
                     _processing->code = 1;
                     pthread_mutex_unlock(&_processing_mutex);
                 } else if (strcmp("ERR", target) == 0) {
-                    _debug("thread_listen -> ERR");
                     _processing->code = 2;
                     pthread_mutex_unlock(&_processing_mutex);
                 } else {
