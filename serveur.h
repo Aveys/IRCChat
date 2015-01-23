@@ -33,3 +33,11 @@ void decalageSalon(int );
 void decalageClientDansSalon(Salon , int );
 
 void getDateTime(char *);
+
+void changeNickname(struct sockaddr_in , struct Message *);
+
+void connectUser(struct sockaddr_in );
+
+void sendMessage(struct sockaddr_in , struct Message *);
+
+void joinSalon(struct sockaddr_in , struct Message *);
