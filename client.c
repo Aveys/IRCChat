@@ -286,7 +286,6 @@ void *thread_listen(void *var) {
             } else if (strcmp("ACK_ALIVE", communication->response.message) == 0) {
                 testProcessingRequestTime();
             } else if (_processing) {
-                _debug(target);
                 if (strcmp("ACK", target) == 0) {
                     _processing->code = 1;
                     pthread_mutex_unlock(&_processing_mutex);
@@ -579,12 +578,10 @@ void _chanLeavedHandler(const Communication *communication) {
     if (strcmp(communication->response.salonCible, _salon) == 0) {
         user = getPartOfCommand(communication->request.message, 2);
 
-        _log("# Le salon a été quitté par %s \n", user);
+        _log("# Le salon a été quitté par %s\n", user);
 
         free(user);
     }
-
-    _log("# Le salon a été quitté par %s\n", user, communication->response.message);
 }
 
 
@@ -748,10 +745,10 @@ int searchSalon(char * salon) {
 * @var salon Le salon à supprimer
 */
 void removeSalon(char * salon) {
-    int i = searchSalon(salon);
+    int i, index = searchSalon(salon);
 
-    if (i >= 0) {
-        for(i = i; i < _nbSalons; i++) {
+    if (index >= 0) {
+        for(i = index; i < _nbSalons; i++) {
             _salons[i] = _salons[i+1];
         }
 
