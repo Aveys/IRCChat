@@ -388,12 +388,9 @@ void _joinHandler(const Communication *communication) {
 
 void _partHandler(const Communication *communication) {
     if (strcmp("ACK_PART", communication->response.message)) {
-        char * salon = getPartOfCommand(communication->request.message, 2);
-        removeSalon(salon);
+        removeSalon(_salon);
 
-        _log("# Vous avez bien quitté le salon\n");
-    } else if (strcmp("ERR_NOCHANNELJOINED", communication->response.message)) {
-        _log("# Vous avez demandé à quitter un salon que vous n'aviez pas rejoint\n");
+        _log("# Vous avez bien quitté le salon <%s>\n", _salon);
     }
 }
 
@@ -438,9 +435,15 @@ void _nickHandler(const Communication *communication) {
 void _messageHandler(const Communication *communication) {
     _debug("MESSAGE");
 
-    char * message = getPartOfCommand(communication->request.message, 2);
+    if (strcmp("ERR_NOCHANNELJOINED", communication->response.message)) {
+        _log("# Vous avez demandé à quitter un salon que vous n'aviez pas rejoint\n");
+    } else {
+        char * message = getPartOfCommand(communication->request.message, 2);
 
-    _log("<%s> %s\n", _nickname, message);
+        _log("<%s> %s\n", _nickname, message);
+
+        free(message);
+    }
 }
 
 void _helpHandler(const Communication *response) {
@@ -546,7 +549,7 @@ void removeSalon(char * salon) {
     int i, index = -1;
 
     for (i = 0; i < nbSalons; i++) {
-        if (strcmp(_salons[i], salon) != 0) {
+        if (strcmp(_salons[i], salon) == 0) {
             index = i;
             break;
         }
@@ -555,10 +558,13 @@ void removeSalon(char * salon) {
     for(i = index; i < nbSalons; i++) {
         _salons[i] = _salons[i+1];
     }
+
+    nbSalons--;
 }
 
 void addSalon(char * salon) {
     if (nbSalons < 10) {
+        _salons[nbSalons] = malloc(sizeof(char) * (strlen(salon) + 1));
         strcpy(_salons[nbSalons], salon);
         nbSalons++;
     }
