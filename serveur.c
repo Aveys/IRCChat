@@ -151,19 +151,26 @@ void sendMessage(struct sockaddr_in client_addr, struct Message *msg){
     char messageRetour[MAX_MESSAGE];
     int indiceSalon = findSalon(msg->salonCible);
     int indiceClient = findClient(client_addr);
-    if(indiceClient != -1) {
-        strcpy(messageSource, msg->message);
-        message = strdup(messageSource);
-        message += 8;
-        sprintf(messageRetour, "MESSAGED %s %s", clients[indiceClient].pseudo, message);
-        strcpy(msg->message, messageRetour);
-        envoyerMessageSalon(salons[indiceSalon], *msg, client_addr);
-        strcpy(msg->message, "ACK_MESSAGE");
+    if(strcmp("",msg->salonCible)==0) {
+        printf("Impossible de parler dans un salon vide\n");
+        strcpy(msg->message, "ERR_EMPTYCHANNEL");
         envoyerMessageClient(client_addr, *msg);
     }
-    else{
-        strcpy(msg->message, "ERR_NOTCONNECTED");
-        envoyerMessageClient(client_addr, *msg);
+    else {
+        if (indiceClient != -1) {
+            strcpy(messageSource, msg->message);
+            message = strdup(messageSource);
+            message += 8;
+            sprintf(messageRetour, "MESSAGED %s %s", clients[indiceClient].pseudo, message);
+            strcpy(msg->message, messageRetour);
+            envoyerMessageSalon(salons[indiceSalon], *msg, client_addr);
+            strcpy(msg->message, "ACK_MESSAGE");
+            envoyerMessageClient(client_addr, *msg);
+        }
+        else {
+            strcpy(msg->message, "ERR_NOTCONNECTED");
+            envoyerMessageClient(client_addr, *msg);
+        }
     }
 }
 //change le pseudonyme d'un utilisateur
