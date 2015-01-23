@@ -43,3 +43,7 @@ void prepend(char *, const char *);
 int call_function(const char *, Communication *);
 
 void sigint(int signal);
+
+void addSalon(char *);
+
+void removeSalon(char *);
