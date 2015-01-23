@@ -2,6 +2,7 @@
 #define MAX_MESSAGE 255
 #define MAX_SALONS 10
 #define MAX_CLIENTS 20
+#define TIMEOUT 10
 
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -10,7 +11,7 @@
 typedef struct Client {
     char pseudo[MAX_NAME];
     struct sockaddr_in socket_addr;
-    int estVivant;
+    time_t estVivant;
 } Client;
 
 typedef struct Salon {

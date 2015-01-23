@@ -4,7 +4,7 @@ void listeCommandes(struct Message *);
 
 struct Message erreurCommande();
 
-struct Message joindreSalon(char * , struct Client *);
+struct Message joindreSalon(struct sockaddr_in adresse, char * , struct Client *);
 
 void quitterSalon(struct sockaddr_in ,char *);
 
@@ -16,7 +16,7 @@ int findSalon(char *);
 
 void envoyerMessageClient(struct sockaddr_in, struct Message );
 
-void envoyerMessageSalon(struct Salon , struct Message );
+void envoyerMessageSalon(struct Salon , struct Message,struct sockaddr_in );
 
 int startsWith(const char *, const char *);
 
@@ -24,7 +24,7 @@ int trouverClientDansSalon(struct Salon ,struct sockaddr_in );
 
 void printClients();
 
-void printSalons();
+void printSalon();
 
 void decalageClient(int );
 
@@ -41,3 +41,7 @@ void connectUser(struct sockaddr_in );
 void sendMessage(struct sockaddr_in , struct Message *);
 
 void joinSalon(struct sockaddr_in , struct Message *);
+
+void actualiserTempsClient(struct sockaddr_in adresse);
+
+void *thread_CheckClient(void *);
