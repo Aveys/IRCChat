@@ -119,8 +119,10 @@ int main(int argc, char *argv[]) {
         }
         else if (startsWith("ALIVE",msg.message) == 1) {
             int indiceClient= findClient(client_addr);
-            printf("%s------- L'utilisateur %s:%s a signalé qu'il était vivant : mise à jour de son temps ---------\n",time_serveur,clients[indiceClient].pseudo,inet_ntoa(client_addr.sin_addr));
-            actualiserTempsClient(client_addr);
+            if(indiceClient != -1) {
+                printf("%s------- L'utilisateur %s:%s a signalé qu'il était vivant : mise à jour de son temps ---------\n", time_serveur, clients[indiceClient].pseudo, inet_ntoa(client_addr.sin_addr));
+                actualiserTempsClient(client_addr);
+            }
         }
         else if(startsWith("EXTINCTSERVER", msg.message)){
             return 0;
