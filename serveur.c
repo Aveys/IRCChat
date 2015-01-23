@@ -175,9 +175,12 @@ void changeNickname(struct sockaddr_in client_addr, struct Message *msg) {
     //printf("%sPseudo actuel : %s\n",time_serveur,clients[indice].pseudo);
     strcpy(ancienPseudo,clients[indice].pseudo);
     //printf("%sAncien pseudo : %s\n",time_serveur,ancienPseudo);//SEGMENTFAULT
+
     strcpy(rep,msg->message);
+    //puts("test");
     nickname= strdup(rep);
     nickname+=5;
+
     getDateTime(time_serveur);
     printf("%sChangement de pseudonyme de %s en %s\n",time_serveur,clients[indice].pseudo,nickname);
     strcpy(clients[indice].pseudo,nickname);// on modifie le client dans la structure client
@@ -268,7 +271,7 @@ void listeCommandes(struct Message *msg){
     strcpy(msg->message,"ACK_HELP /SERVER <@IP>: Demander la connexion au serveur \n - /NICK <pseudonyme>: Changer de pseudonyme \n - /JOIN <Salon>: Rejoindre un serveur \n - /PART : Quitter le salon \n - /LIST : Lister les salons ouverts \n - /HELP : Afficher la liste des commandes possibles\n");
     strcpy(msg->salonCible,"");
 }
-
+//envoi l'erreur de la commande
 struct Message erreurCommande(){
     struct Message ret;
     strcpy(ret.salonCible,"");
@@ -388,7 +391,7 @@ void decalageClientDansSalon(Salon s, int pos){
         s.clients[i]=s.clients[i+1];
     }
 }
-//Actualise la variable globale du temps
+//Actualise la variable globale du tempss
 void getDateTime(char *t){
     time_t rawtime;
     struct tm *info;
