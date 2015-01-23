@@ -28,9 +28,11 @@ void * thread_alive(void *);
 
 void *thread_listen(void *);
 
+void _refreshScreen(void);
+
 void _log(const char *, ...);
 
-void _debug(const char *, ...);
+void _debug(const char *);
 
 int server(const char *, const char *);
 
@@ -47,3 +49,7 @@ void sigint(int signal);
 void addSalon(char *);
 
 void removeSalon(char *);
+
+void addMessage(char *);
+
+void _quitHandler(const Communication *);

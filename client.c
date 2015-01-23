@@ -1,6 +1,6 @@
 /**
 *
-* @author Vincent Valot, Mohammed Zizah
+* @author Vincent Valot
 * @brief Implémentation d'un client pour un chat entre plusieurs autres clients
 *
 */
@@ -22,36 +22,36 @@
 /**
 * Socket client
 */
-int sckt = -1;
+int _socket = -1;
 
 /**
 * Variable de debug
 */
-int debug = 0;
+int _isDebug = 0;
 
 /**
 * Structures de gestion d'adresses cliente et serveur
 */
-struct sockaddr_in client_addr, serv_addr;
-socklen_t addr_len;
+struct sockaddr_in _client_addr, _serv_addr;
+socklen_t _addr_len;
 
 /**
 * Thread d'écoute serveur
 */
-pthread_t send_pthread;
-pthread_attr_t send_pthread_attr;
+pthread_t _send_pthread;
+pthread_attr_t _send_pthread_attr;
 
 /**
 * Thread d'envoie de ping
 */
-pthread_t alive_pthread;
-pthread_attr_t alive_pthread_attr;
+pthread_t _alive_pthread;
+pthread_attr_t _alive_pthread_attr;
 
 /**
 * Thread d'écoute serveur
 */
-pthread_t listen_pthread;
-pthread_attr_t listen_pthread_attr;
+pthread_t _listen_pthread;
+pthread_attr_t _listen_pthread_attr;
 
 /**
 * Thread de blocage communicate
@@ -72,17 +72,18 @@ char *_salon;
 * Salons courants du client
 */
 char * _salons[10];
-int nbSalons = 0;
+int _nbSalons = 0;
 
 /**
 * Communication en envoi
 */
 Communication *_processing;
 
-void sigint(int signal) {
-    _log("\n# Fermeture de l'application... Veuillez patienter...\n");
-    pthread_exit(NULL);
-}
+/**
+* Messages sauvegardés
+*/
+char * _messages[20];
+int _nbMessages = 0;
 
 int main(int argc, char *argv[]) {
     char *input;
@@ -94,20 +95,17 @@ int main(int argc, char *argv[]) {
     _log("# Bienvenue");
     if (argc > 1) {
         if (strcmp("--debug", argv[1]) == 0) {
-            debug = 1;
-            _log(" (debug is active)");
+            _isDebug = 1;
         }
     }
-
-    signal(SIGINT, sigint);
 
     pthread_mutex_init(&_processing_mutex, NULL);
     pthread_mutex_lock(&_processing_mutex);
 
-    client_addr.sin_family = AF_INET;
-    client_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    client_addr.sin_port = htons(0);
-    serv_addr.sin_family = AF_INET;
+    _client_addr.sin_family = AF_INET;
+    _client_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    _client_addr.sin_port = htons(0);
+    _serv_addr.sin_family = AF_INET;
 
     _log("\n# Entrez une commande (/HELP pour recevoir de l'aide)\n");
 
@@ -131,45 +129,64 @@ int main(int argc, char *argv[]) {
                     port = strtok(NULL, " ");
 
                     if (address && port) {
-                        if (server(address, port) == 0) {
-                            _log("# Connexion au serveur %s port %s établie\n", address, port);
+                        server(address, port);
 
-                            pthread_attr_init(&listen_pthread_attr);
-                            pthread_attr_setdetachstate(&listen_pthread_attr, PTHREAD_CREATE_JOINABLE);
+                            pthread_attr_init(&_listen_pthread_attr);
+                            pthread_attr_setdetachstate(&_listen_pthread_attr, PTHREAD_CREATE_JOINABLE);
 
                             _debug("main -> creating thread_listen");
-                            pthread_create(&listen_pthread, &listen_pthread_attr, thread_listen, NULL);
+                            pthread_create(&_listen_pthread, &_listen_pthread_attr, thread_listen, NULL);
 
-                            communicate("CONNECT", "CONNECT");
+                            if (communicate("CONNECT", "CONNECT") == 0) {
+                                pthread_attr_init(&_alive_pthread_attr);
+                                pthread_attr_setdetachstate(&_alive_pthread_attr, PTHREAD_CREATE_JOINABLE);
 
-                            pthread_attr_init(&alive_pthread_attr);
-                            pthread_attr_setdetachstate(&alive_pthread_attr, PTHREAD_CREATE_JOINABLE);
+                                _debug("main -> creating thread_alive");
+                                pthread_create(&_alive_pthread, &_alive_pthread_attr, thread_alive, NULL);
 
-                            _debug("main -> creating thread_alive");
-                            pthread_create(&alive_pthread, &alive_pthread_attr, thread_alive, NULL);
-                        } else {
-                            _log("# Connexion au serveur %s port %s échouée\n", address, port);
-                        }
+                                _log("# Connexion au serveur %s port %s établie\n", address, port);
+                            } else {
+                                _log("# Connexion au serveur %s port %s échouée\n", address, port);
+                                pthread_mutex_unlock(&_processing_mutex);
+                            }
                     } else {
-                        _log("# Utilisation de SERVER: /SERVER ip port [pseudonyme]\n");
+                        _log("# Utilisation de SERVER: /SERVER ip port\n");
                     }
-                } else if (command && sckt != -1) {
+                } else if (command && _socket != -1) {
                     communicate(command, input);
                 }
-            } else if (sckt != -1) {
+            } else if (_socket != -1) {
                 prepend(input, "MESSAGE ");
                 communicate("MESSAGE", input);
             }
 
-            if (sckt == -1) {
+            if (_socket == -1) {
                 _log("# Vous n'êtes connecté à aucun serveur\n");
             }
         }
     } while (strcmp(command, "EXIT") != 0);
 
     _log("# Fermeture de l'application\n");
+    _quitHandler(_processing);
 
     return 0;
+}
+
+/**
+* Rafraichis l'écran
+*/
+void _refreshScreen(void) {
+    printf("\033[1;1H\033[2J");
+
+    if (_salon) {
+        printf("# Salon \033[0;32m%s\033[0;37m\n", _salon);
+    }
+
+    if (_nbMessages > 0) {
+        for (int i = _nbMessages - 1; i >= 0; i--) {
+            printf("%s", _messages[i]);
+        }
+    }
 }
 
 /**
@@ -178,25 +195,35 @@ int main(int argc, char *argv[]) {
 * @var ...      variables à utiliser
 */
 void _log(const char *message, ...) {
+    char str[512];
+
     va_list argptr;
     va_start(argptr, message);
-    vfprintf(stderr, message, argptr);
+    vsprintf(str, message, argptr);
     va_end(argptr);
+
+    addMessage(str);
+    _refreshScreen();
 }
 
-void _debug(const char *message, ...) {
+void _debug(const char *message) {
     time_t current;
     struct tm date;
+    char str[512];
     char format[128];
 
-    if (debug == 1) {
+    if (_isDebug == 1) {
 
         time(&current);
         date = *localtime(&current);
 
         strftime(format, 128, "%Y-%m-%d %H:%M:%s", &date);
 
-        printf("DEBUG\t%s\t%s\n", format, message);
+        sprintf(str, "DEBUG\t%s\t%s\n", format, message);
+
+        addMessage(str);
+
+        _refreshScreen();
     }
 }
 
@@ -215,7 +242,7 @@ void *thread_send(void *var) {
         strcpy(_processing->request.salonCible, _salon);
     }
 
-    if (sendto(sckt, &_processing->request, sizeof(_processing->request) + 1, 0, (struct sockaddr *) &serv_addr, addr_len) == -1) {
+    if (sendto(_socket, &_processing->request, sizeof(_processing->request) + 1, 0, (struct sockaddr *) &_serv_addr, _addr_len) == -1) {
         perror("sendto()");
     }
 
@@ -242,25 +269,31 @@ void testProcessingRequestTime() {
 */
 void *thread_listen(void *var) {
     Communication * communication = malloc(sizeof(Communication));
-    char target[3];
+    char target[4];
     char * command;
 
-    while (sckt != -1) {
+    while (_socket != -1) {
         _debug("thread_listen -> Waiting...");
-        if (recvfrom(sckt, &communication->response, sizeof(communication->response), 0, (struct sockaddr *) &serv_addr, &addr_len) > 0) {
+        if (recvfrom(_socket, &communication->response, sizeof(communication->response), 0, (struct sockaddr *) &_serv_addr, &_addr_len) > 0) {
             _debug("thread_listen -> Received");
+            _debug(communication->response.message);
 
             strncpy(target, communication->response.message, 3);
+            target[3] = '\0';
 
             if (strcmp("ERR_CMDUNKNOWN", communication->response.message) == 0) {
                 _log("# La commande n'est pas reconnue par le serveur\n");
             } else if (strcmp("ACK_ALIVE", communication->response.message) == 0) {
                 testProcessingRequestTime();
             } else if (_processing) {
+                _debug("thread_listen -> if _processing");
+                _debug(target);
                 if (strcmp("ACK", target) == 0) {
+                    _debug("thread_listen -> ACK");
                     _processing->code = 1;
                     pthread_mutex_unlock(&_processing_mutex);
                 } else if (strcmp("ERR", target) == 0) {
+                    _debug("thread_listen -> ERR");
                     _processing->code = 2;
                     pthread_mutex_unlock(&_processing_mutex);
                 } else {
@@ -287,19 +320,21 @@ void *thread_listen(void *var) {
 * @return 0 on success, 1 on error
 */
 int communicate(const char * command, char * message) {
+    _debug("communicate -> beginning...");
     char input[3];
 
-    pthread_attr_init(&send_pthread_attr);
-    pthread_attr_setdetachstate(&send_pthread_attr, PTHREAD_CREATE_JOINABLE);
+    pthread_attr_init(&_send_pthread_attr);
+    pthread_attr_setdetachstate(&_send_pthread_attr, PTHREAD_CREATE_JOINABLE);
 
-    pthread_create(&send_pthread, &send_pthread_attr, thread_send, (void *) message);
-    pthread_join(send_pthread, NULL);
+    pthread_create(&_send_pthread, &_send_pthread_attr, thread_send, (void *) message);
+    pthread_join(_send_pthread, NULL);
 
-    pthread_attr_destroy(&send_pthread_attr);
+    pthread_attr_destroy(&_send_pthread_attr);
 
     // On bloque ici en attente d'avoir l'ACK, si on ne reçois pas
     _debug("communicate -> Waiting for response");
     pthread_mutex_lock(&_processing_mutex);
+    _debug("communicate -> Response acquired");
 
     // Test de la valeur de retour
     if (_processing->code) {
@@ -331,8 +366,8 @@ void *thread_alive(void *var) {
     struct Message message;
     strcpy(message.message, "ALIVE");
 
-    while (sckt != -1) {
-        if (sendto(sckt, &message, sizeof(message) + 1, 0, (struct sockaddr *) &serv_addr, addr_len) == -1) {
+    while (_socket != -1) {
+        if (sendto(_socket, &message, sizeof(message) + 1, 0, (struct sockaddr *) &_serv_addr, _addr_len) == -1) {
             perror("sendto()");
         }
 
@@ -349,32 +384,35 @@ void *thread_alive(void *var) {
 * @var port     Port du serveur
 */
 int server(const char *address, const char *port) {
-    if ((sckt = socket(PF_INET, SOCK_DGRAM, 0)) == -1) {
+    if ((_socket = socket(PF_INET, SOCK_DGRAM, 0)) == -1) {
         return 1;
     }
 
-    if (bind(sckt, (struct sockaddr *) &client_addr, sizeof client_addr) == -1) {
+    if (bind(_socket, (struct sockaddr *) &_client_addr, sizeof _client_addr) == -1) {
         perror("bind");
         return 1;
     }
 
-    if (inet_aton(address, &(serv_addr.sin_addr)) == 0) {
+    if (inet_aton(address, &(_serv_addr.sin_addr)) == 0) {
         _log("# Le format de l'adresse serveur est invalide <%s>\n", address);
         return 1;
     }
 
-    serv_addr.sin_port = htons(atoi(port));
+    _serv_addr.sin_port = htons(atoi(port));
 
-    addr_len = sizeof(serv_addr);
+    _addr_len = sizeof(_serv_addr);
 
     return 0;
 }
 
 /**
-* Handler d'un envoi de message Join
+* Handler d'un envoi de message
+* @var Communication la communication liée
 */
 void _joinHandler(const Communication *communication) {
     char * tmp = getPartOfCommand(communication->request.message, 2);
+
+    _nbMessages = 0;
 
     if (strlen(tmp) > 0) {
         _salon = strdup(tmp);
@@ -386,6 +424,11 @@ void _joinHandler(const Communication *communication) {
     }
 }
 
+
+/**
+* Handler d'un envoi de message
+* @var Communication la communication liée
+*/
 void _partHandler(const Communication *communication) {
     if (strcmp("ACK_PART", communication->response.message)) {
         removeSalon(_salon);
@@ -395,30 +438,39 @@ void _partHandler(const Communication *communication) {
 }
 
 /**
-* Handler pour quitter un serveur
+* Handler d'un envoi de message
+* @var Communication la communication liée
 */
 void _quitHandler(const Communication *communication) {
-    if (sckt != -1) {
+    if (_socket != -1) {
+        close(_socket);
+        _socket = -1;
+
         _log("# Fermeture de la connexion serveur...\n");
-        pthread_join(send_pthread, NULL);
-        pthread_join(alive_pthread, NULL);
-        pthread_join(listen_pthread, NULL);
+        pthread_join(_send_pthread, NULL);
+        pthread_join(_alive_pthread, NULL);
+        pthread_join(_listen_pthread, NULL);
 
-        pthread_attr_destroy(&send_pthread_attr);
-        pthread_attr_destroy(&alive_pthread_attr);
-        pthread_attr_destroy(&listen_pthread_attr);
-
-        close(sckt);
-        sckt = -1;
+        pthread_attr_destroy(&_send_pthread_attr);
+        pthread_attr_destroy(&_alive_pthread_attr);
+        pthread_attr_destroy(&_listen_pthread_attr);
     }
 }
 
+/**
+* Handler d'un envoi de message
+* @var Communication la communication liée
+*/
 void _listHandler(const Communication *communication) {
     char * salons = getPartOfCommand(communication->request.message, 2);
 
     _log("Les salons disponibles sont: %s", salons);
 }
 
+/**
+* Handler d'un envoi de message
+* @var Communication la communication liée
+*/
 void _nickHandler(const Communication *communication) {
     char *tmp = getPartOfCommand(communication->request.message, 2);
 
@@ -432,20 +484,36 @@ void _nickHandler(const Communication *communication) {
     free(tmp);
 }
 
+/**
+* Handler d'un envoi de message
+* @var Communication la communication liée
+*/
 void _messageHandler(const Communication *communication) {
     _debug("MESSAGE");
+    time_t current;
+    struct tm date;
+    char format[128];
 
-    if (strcmp("ERR_NOCHANNELJOINED", communication->response.message)) {
+    time(&current);
+    date = *localtime(&current);
+
+    strftime(format, 128, "%H:%M", &date);
+
+    if (strcmp("ERR_NOCHANNELJOINED", communication->response.message) == 0) {
         _log("# Vous avez demandé à quitter un salon que vous n'aviez pas rejoint\n");
     } else {
         char * message = getPartOfCommand(communication->request.message, 2);
 
-        _log("<%s> %s\n", _nickname, message);
+        _log("%s <\033[1m\033[41m%s\033[0;37m> %s\n", format, _nickname, message);
 
         free(message);
     }
 }
 
+/**
+* Handler d'un envoi de message
+* @var Communication la communication liée
+*/
 void _helpHandler(const Communication *communication) {
     _debug("HELP");
 
@@ -549,28 +617,45 @@ char *getPartOfCommand(const char *command, int part) {
     return value;
 }
 
+void addMessage(char * message) {
+    if (_nbMessages > 0) {
+        for (int i = _nbMessages - 1; i > 0; i--) {
+            free(_messages[i]);
+            _messages[i] = strdup(_messages[i - 1]);
+        }
+    } else {
+        free(_messages[0]);
+    }
+
+    _messages[0] = strdup(message);
+
+    if (_nbMessages < 20) {
+        _nbMessages++;
+    }
+}
+
 void removeSalon(char * salon) {
     int i, index = -1;
 
-    for (i = 0; i < nbSalons; i++) {
+    for (i = 0; i < _nbSalons; i++) {
         if (strcmp(_salons[i], salon) == 0) {
             index = i;
             break;
         }
     }
 
-    for(i = index; i < nbSalons; i++) {
+    for(i = index; i < _nbSalons; i++) {
         _salons[i] = _salons[i+1];
     }
 
-    nbSalons--;
+    _nbSalons--;
 }
 
 void addSalon(char * salon) {
-    if (nbSalons < 10) {
-        _salons[nbSalons] = malloc(sizeof(char) * (strlen(salon) + 1));
-        strcpy(_salons[nbSalons], salon);
-        nbSalons++;
+    if (_nbSalons < 10) {
+        _salons[_nbSalons] = malloc(sizeof(char) * (strlen(salon) + 1));
+        strcpy(_salons[_nbSalons], salon);
+        _nbSalons++;
     }
 }
 
