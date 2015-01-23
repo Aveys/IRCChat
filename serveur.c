@@ -22,7 +22,7 @@ int sd;
 
 char time_serveur[80];
 
-int main(int argc, char *argv[]) {
+int main(void) {
 
 
     int n;
@@ -52,8 +52,6 @@ int main(int argc, char *argv[]) {
         perror("pthread_create");
         return EXIT_FAILURE;
     }
-
-    struct Client tmp;//décalaration des variables utiles au fonctionnement A SUPPRIMER UNE FOIS LA FACTORISATION FAITE
 
     printf("------ Lancement du serveur ------\n");
     for (; ;) {//
@@ -513,12 +511,13 @@ void actualiserTempsClient(struct sockaddr_in adresse){
         printf("CLIENT INTROUVABLE LORS DE LA MISE A JOUR : risque de suppresion entre temps");
 }
 
-void *thread_CheckClient(void *args){
+void *thread_CheckClient(void *test){
     time_t t;
     double diff;
     for(; ;){
         for (int i = 0; i < nbClients; ++i) {
             sleep(20);
+            time(&t);
             getDateTime(time_serveur);
             fprintf(stdout,"%s[THREAD] - Lancement de la vérification du timeout client\n",time_serveur);
             diff=difftime(t, clients[i].estVivant);
