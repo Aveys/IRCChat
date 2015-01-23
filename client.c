@@ -217,7 +217,7 @@ void _debug(const char *message) {
         time(&current);
         date = *localtime(&current);
 
-        strftime(format, 128, "%Y-%m-%d %H:%M:%s", &date);
+        strftime(format, 128, "%Y-%m-%d %H:%M:%S", &date);
 
         sprintf(str, "DEBUG\t%s\t%s\n", format, message);
 
