@@ -194,7 +194,7 @@ void _debug(const char *message, ...) {
         time(&current);
         date = *localtime(&current);
 
-        strftime(format, 128, "%Y-%m-%d %H:%M", &date);
+        strftime(format, 128, "%Y-%m-%d %H:%M:%s", &date);
 
         printf("DEBUG\t%s\t%s\n", format, message);
     }
@@ -446,8 +446,12 @@ void _messageHandler(const Communication *communication) {
     }
 }
 
-void _helpHandler(const Communication *response) {
+void _helpHandler(const Communication *communication) {
     _debug("HELP");
+
+    char * message = getPartOfCommand(communication->request.message, 2);
+
+    _log("# Commandes disponible: %s", message);
 }
 
 /**
