@@ -287,6 +287,7 @@ void *thread_listen(void *var) {
                 testProcessingRequestTime();
             } else if (_processing) {
                 if (strcmp("ACK", target) == 0) {
+                    _debug(target);
                     _processing->code = 1;
                     pthread_mutex_unlock(&_processing_mutex);
                 } else if (strcmp("ERR", target) == 0) {
@@ -494,6 +495,8 @@ void _messageHandler(const Communication *communication) {
     date = *localtime(&current);
 
     strftime(format, 128, "%H:%M", &date);
+
+
 
     if (strcmp("ERR_NOCHANNELJOINED", communication->response.message) == 0) {
         _log("# Vous n'avez pas rejoint de salon\n");

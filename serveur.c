@@ -523,7 +523,7 @@ void *thread_CheckClient(void *test){
             diff=difftime(t, clients[i].estVivant);
             if(diff > TIMEOUT){
                 fprintf(stdout, "%s[THREAD] - !!!!!!!!! Suppression de l'utilisateur %s : Timeout écoulé !!!!!!!!!!!!!\n",time_serveur,clients[i].pseudo);
-                quitterServeur(clients[i].socket_addr);
+                //quitterServeur(clients[i].socket_addr);
             }
 
         }
